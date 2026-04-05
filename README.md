@@ -61,6 +61,15 @@ Transactions are normalized into a canonical schema and stored in a local SQLite
 
 ---
 
+## Development
+
+```bash
+# Navigate to TD EasyWeb and dump the accessibility tree to logs/td_landing_page.txt
+cargo run --bin inspect_td
+```
+
+---
+
 ## Usage
 
 ```bash
@@ -100,7 +109,8 @@ src/
 │   └── tools.rs         # Tool execution dispatch
 ├── browser/
 │   ├── mod.rs           # Session: launch, snapshot, resolve refs
-│   ├── snapshot.rs      # CDP accessibility tree → compact text + ref map
+│   ├── ax.rs            # AX tree conversion: raw CDP nodes → compact LLM text
+│   ├── snapshot.rs      # CDP GetFullAxTree → AxSummary via ax.rs
 │   ├── actions.rs       # click/type/navigate via XPath
 │   └── network.rs       # XHR/fetch response interception
 ├── connectors/

@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
         .with_env_filter("warn")
         .init();
 
-    let (browser, mut handler) = Browser::launch(
+    let (mut browser, mut handler) = Browser::launch(
         BrowserConfig::builder()
             .with_head()
             .args([
@@ -50,5 +50,8 @@ async fn main() -> Result<()> {
     fs::write(out_path, &dump)?;
 
     println!("saved to {}", out_path.display());
+
+    browser.close().await?;
+    browser.wait().await?;
     Ok(())
 }
