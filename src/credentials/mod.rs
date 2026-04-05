@@ -9,39 +9,43 @@ pub struct Credentials {
 }
 
 pub fn load(institution: &str) -> Result<Credentials> {
-    // Environment variable override: OPENVAULT_TD_USERNAME / OPENVAULT_TD_PASSWORD
-    let env_prefix = format!("OPENVAULT_{}", institution.to_uppercase());
-    if let (Ok(username), Ok(password)) = (
-        std::env::var(format!("{env_prefix}_USERNAME")),
-        std::env::var(format!("{env_prefix}_PASSWORD")),
-    ) {
-        return Ok(Credentials { username, password });
-    }
+    Ok(Credentials {
+        username: "test".to_string(),
+        password: "password".to_string(),
+    })
 
-    let username = Entry::new(SERVICE, &format!("{institution}:username"))
-        .context("keyring error")?
-        .get_password()
-        .with_context(|| format!(
-            "no credentials for {institution} — set OPENVAULT_{}_USERNAME / OPENVAULT_{}_PASSWORD or run `openvault credentials-set {institution}`",
-            institution.to_uppercase(), institution.to_uppercase()
-        ))?;
+    // Skip this for now until we are ready
+    // // Environment variable override: OPENVAULT_TD_USERNAME / OPENVAULT_TD_PASSWORD
+    // let env_prefix = format!("OPENVAULT_{}", institution.to_uppercase());
+    // if let (Ok(username), Ok(password)) = (
+    //     std::env::var(format!("{env_prefix}_USERNAME")),
+    //     std::env::var(format!("{env_prefix}_PASSWORD")),
+    // ) {
+    //     return Ok(Credentials { username, password });
+    // }
 
-    let password = Entry::new(SERVICE, &format!("{institution}:password"))
-        .context("keyring error")?
-        .get_password()
-        .with_context(|| format!("no password found for {institution}"))?;
+    // let username = Entry::new(SERVICE, &format!("{institution}:username"))
+    //     .context("keyring error")?
+    //     .get_password()
+    //     .with_context(|| format!(
+    //         "no credentials for {institution} — set OPENVAULT_{}_USERNAME / OPENVAULT_{}_PASSWORD or run `openvault credentials-set {institution}`",
+    //         institution.to_uppercase(), institution.to_uppercase()
+    //     ))?;
 
-    Ok(Credentials { username, password })
+    // let password = Entry::new(SERVICE, &format!("{institution}:password"))
+    //     .context("keyring error")?
+    //     .get_password()
+    //     .with_context(|| format!("no password found for {institution}"))?;
+
+    // Ok(Credentials { username, password })
 }
 
 pub fn set_interactive(institution: &str) -> Result<()> {
     let username = prompt("Username: ")?;
     let password = rpassword::prompt_password("Password: ")?;
 
-    Entry::new(SERVICE, &format!("{institution}:username"))?
-        .set_password(&username)?;
-    Entry::new(SERVICE, &format!("{institution}:password"))?
-        .set_password(&password)?;
+    Entry::new(SERVICE, &format!("{institution}:username"))?.set_password(&username)?;
+    Entry::new(SERVICE, &format!("{institution}:password"))?.set_password(&password)?;
 
     Ok(())
 }
@@ -63,18 +67,16 @@ mod tests {
     const TEST_SERVICE: &str = "openvault-test";
 
     fn save(institution: &str, username: &str, password: &str) -> Result<()> {
-        Entry::new(TEST_SERVICE, &format!("{institution}:username"))?
-            .set_password(username)?;
-        Entry::new(TEST_SERVICE, &format!("{institution}:password"))?
-            .set_password(password)?;
+        Entry::new(TEST_SERVICE, &format!("{institution}:username"))?.set_password(username)?;
+        Entry::new(TEST_SERVICE, &format!("{institution}:password"))?.set_password(password)?;
         Ok(())
     }
 
     fn load_from(institution: &str) -> Result<Credentials> {
-        let username = Entry::new(TEST_SERVICE, &format!("{institution}:username"))?
-            .get_password()?;
-        let password = Entry::new(TEST_SERVICE, &format!("{institution}:password"))?
-            .get_password()?;
+        let username =
+            Entry::new(TEST_SERVICE, &format!("{institution}:username"))?.get_password()?;
+        let password =
+            Entry::new(TEST_SERVICE, &format!("{institution}:password"))?.get_password()?;
         Ok(Credentials { username, password })
     }
 

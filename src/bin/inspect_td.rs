@@ -1,9 +1,11 @@
-/// Standalone inspector: navigates to TD EasyWeb and dumps all input
-/// elements across every frame so we know the exact attributes to target.
+/// Navigate to TD EasyWeb, dump all readable elements across every frame,
+/// and save the output to logs/td_landing_page.txt.
 use anyhow::Result;
 use chromiumoxide::{Browser, BrowserConfig};
 use futures::StreamExt;
 use openvault::browser::BrowserActions;
+use std::fs;
+use std::path::Path;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -34,15 +36,19 @@ async fn main() -> Result<()> {
     let page = browser.new_page("about:blank").await?;
     let actions = BrowserActions::new(&page);
 
-    println!("navigating to TD EasyWeb...");
+    println!("navigating to https://easyweb.td.com ...");
     actions.navigate("https://easyweb.td.com").await?;
 
-    // Wait a moment for JS to render
+    // Give JS time to fully render the page and iframes
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-    println!("dumping frames...\n");
+    println!("dumping frames...");
     let dump = actions.dump_frames().await?;
-    println!("{dump}");
 
+    let out_path = Path::new("logs/td_landing_page.txt");
+    fs::create_dir_all(out_path.parent().unwrap())?;
+    fs::write(out_path, &dump)?;
+
+    println!("saved to {}", out_path.display());
     Ok(())
 }

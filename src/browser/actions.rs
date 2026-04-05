@@ -271,6 +271,12 @@ fn xpath_candidates(role: &str, name: &str) -> Vec<String> {
             format!("//textarea[@placeholder='{n}']"),
             format!("//textarea[@aria-label='{n}']"),
             format!("//*[@role='textbox' and @aria-label='{n}']"),
+            // Label-based: find input whose associated <label> contains the name text.
+            // Handles Angular/React forms where the name is only in the label, not the input attrs.
+            format!("//input[@id=//label[contains(normalize-space(.), '{n}')]/@for]"),
+            format!("//input[contains(@aria-describedby, 'label') and //label[contains(normalize-space(.), '{n}')]]"),
+            format!("//label[contains(normalize-space(.), '{n}')]/..//input[not(@type='hidden')]"),
+            format!("//label[contains(normalize-space(.), '{n}')]/following::input[1][not(@type='hidden')]"),
         ],
         "checkbox" => vec![
             format!("//input[@type='checkbox' and @aria-label='{n}']"),
