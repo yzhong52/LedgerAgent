@@ -74,6 +74,51 @@ impl<'a> BrowserActions<'a> {
             .with_context(|| format!("could not find [{role}] \"{name}\" in main doc or any iframe"))
     }
 
+    /// Dump all interactive elements (inputs, buttons, links) with their full
+    /// raw HTML attributes. Complements dump_frames() which shows the AX tree —
+    /// this shows the actual DOM so you can identify exact selectors and text.
+    pub async fn dump_elements(&self) -> Result<String> {
+        let js = r#"
+            (function() {
+                var els = document.querySelectorAll('input, button, a[href], select, textarea');
+                return Array.from(els).map(function(el) {
+                    var attrs = {};
+                    for (var i = 0; i < el.attributes.length; i++) {
+                        attrs[el.attributes[i].name] = el.attributes[i].value;
+                    }
+                    return JSON.stringify({
+                        tag: el.tagName.toLowerCase(),
+                        attrs: attrs,
+                        text: (el.innerText || el.value || '').trim().slice(0, 80)
+                    });
+                }).join('\n');
+            })()
+        "#;
+        let result = self.page.evaluate_expression(js).await?;
+        Ok(result.value()
+            .and_then(|v| v.as_str().map(|s| s.to_string()))
+            .unwrap_or_default())
+    }
+
+    /// Type text into an element matched by an XPath expression directly.
+    /// Useful when inputs have no accessible name (no aria-label, placeholder, or label)
+    /// and must be targeted by position, e.g. `(//input[@type='text'])[1]`.
+    pub async fn type_by_xpath(&self, xpath: &str, text: &str) -> Result<()> {
+        let el = self.page.find_xpath(xpath).await
+            .with_context(|| format!("could not find element: {xpath}"))?;
+        el.click().await?;
+        el.type_str(text).await?;
+        Ok(())
+    }
+
+    /// Click an element matched by an XPath expression directly.
+    pub async fn click_by_xpath(&self, xpath: &str) -> Result<()> {
+        let el = self.page.find_xpath(xpath).await
+            .with_context(|| format!("could not find element: {xpath}"))?;
+        el.click().await?;
+        Ok(())
+    }
+
     /// Dump the page as a compact accessibility tree snapshot.
     ///
     /// Uses `GetFullAxTree` (CDP) which traverses *all* frames — including

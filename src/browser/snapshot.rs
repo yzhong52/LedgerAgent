@@ -31,7 +31,7 @@ impl AccessibilitySnapshot {
                 // about:blank and pages mid-navigation return CDP errors like
                 // "uninteresting" — return an empty snapshot so the agent can
                 // still proceed (it will navigate first, then re-snapshot).
-                tracing::debug!("accessibility snapshot unavailable: {e}");
+                tracing::warn!("accessibility snapshot unavailable: {e}");
                 Ok(Self::empty())
             }
         }

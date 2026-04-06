@@ -15,6 +15,10 @@ path = "src/bin/inspect_td.rs"
 name = "inspect_wealthsimple"
 path = "src/bin/inspect_wealthsimple.rs"
 
+[[bin]]
+name = "inspect_questrade"
+path = "src/bin/inspect_questrade.rs"
+
 [lib]
 name = "openvault"
 path = "src/lib.rs"
