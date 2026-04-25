@@ -21,8 +21,7 @@ async function main() {
     console.log(`saved logs/ws_${label}.txt`);
   };
 
-  await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle');
+  await page.goto(LOGIN_URL, { waitUntil: 'load' });
   await snap('login');
 
   const alreadyLoggedIn = !(await page.getByRole('textbox', { name: /Log in email/i })
@@ -38,9 +37,9 @@ async function main() {
 
     await page.getByRole('textbox', { name: /Log in email/i }).fill(email);
     await page.getByRole('textbox', { name: /Password/i }).fill(password);
-    await page.getByRole('button', { name: /Log in/i }).click();
+    await page.getByTestId('login-form-submit-ftux').click();
 
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('load');
 
     const needsMfa = await page.getByRole('textbox', { name: /Enter your code/i })
       .isVisible({ timeout: 3000 }).catch(() => false);
@@ -50,7 +49,7 @@ async function main() {
       const otp = await prompt('Enter 6-digit verification code: ');
       await page.getByRole('textbox', { name: /Enter your code/i }).fill(otp.trim());
       await page.getByRole('button', { name: /Submit/i }).click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
     }
   }
 
