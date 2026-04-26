@@ -19,10 +19,6 @@ function sleep(ms: number): Promise<void> {
 // State
 // ---------------------------------------------------------------------------
 
-// The login flow moves through these states in order.
-// Claude signals each transition by calling the corresponding tool.
-type LoginState = 'login_form' | 'mfa' | 'success';
-
 interface Credentials {
   email: string;
   password: string;
@@ -45,7 +41,8 @@ Login flow:
   2. Submit the form.
   3. If a multi-factor authentication (MFA) or verification code screen appears,
      call request_mfa_code with a short description of what the user should do.
-     The tool returns the code the user typed — fill it in and submit.
+     The tool returns the code the user typed — use the type tool (not fill)
+     to enter it, then submit.
   4. Once you can see the account dashboard or portfolio summary, call success.
 
 Always call snapshot after submitting a form or clicking a button so you can
@@ -70,6 +67,19 @@ const TOOLS: Tool[] = [
       properties: {
         role: { type: 'string', description: 'ARIA role, e.g. textbox, combobox' },
         name: { type: 'string', description: 'Accessible name of the field (label text)' },
+        value: { type: 'string' },
+      },
+      required: ['role', 'name', 'value'],
+    },
+  },
+  {
+    name: 'type',
+    description: 'Type text into a field character-by-character, firing real key events. Use this instead of fill for OTP / verification code fields where key events are required to enable the submit button.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        role: { type: 'string' },
+        name: { type: 'string' },
         value: { type: 'string' },
       },
       required: ['role', 'name', 'value'],
@@ -135,6 +145,12 @@ async function executeTool(
       const role = input.role as Parameters<typeof page.getByRole>[0];
       await page.getByRole(role, { name: input.name }).fill(input.value);
       return { output: `filled ${input.role} "${input.name}"`, done: false };
+    }
+
+    case 'type': {
+      const role = input.role as Parameters<typeof page.getByRole>[0];
+      await page.getByRole(role, { name: input.name }).pressSequentially(input.value);
+      return { output: `typed into ${input.role} "${input.name}"`, done: false };
     }
 
     case 'click': {
