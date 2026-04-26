@@ -4,6 +4,17 @@ import { chromium, type Page } from 'playwright';
 import * as fs from 'fs/promises';
 import * as readline from 'readline';
 
+// Set DEBUG=1 to log each message sent to Claude and pause 1s between tool calls.
+const DEBUG = process.env.DEBUG === '1';
+
+function debug(...args: unknown[]): void {
+  if (DEBUG) console.log(...args);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -129,13 +140,14 @@ async function executeTool(
     case 'click': {
       const role = input.role as Parameters<typeof page.getByRole>[0];
       await page.getByRole(role, { name: input.name }).click();
-      await page.waitForLoadState('load');
+      // Use a short timeout — SPA navigation won't fire a full 'load' event.
+      await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
       return { output: `clicked ${input.role} "${input.name}"`, done: false };
     }
 
     case 'click_testid': {
       await page.getByTestId(input.testId).click();
-      await page.waitForLoadState('load');
+      await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
       return { output: `clicked [data-testid="${input.testId}"]`, done: false };
     }
 
@@ -175,6 +187,11 @@ async function login(page: Page, url: string, creds: Credentials): Promise<void>
   console.log('agent: starting login...');
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
+    const lastMessage = messages[messages.length - 1];
+    debug('\n── prompt to claude ──────────────────────────────');
+    debug(JSON.stringify(lastMessage, null, 2));
+    debug('──────────────────────────────────────────────────\n');
+
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 1024,
@@ -212,6 +229,7 @@ async function login(page: Page, url: string, creds: Credentials): Promise<void>
       }
 
       console.log(`[tool] → ${output.length > 120 ? output.slice(0, 120) + '…' : output}`);
+      if (DEBUG) await sleep(1000);
 
       toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
       if (toolDone) { done = true; break; }
