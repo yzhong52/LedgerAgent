@@ -9,10 +9,6 @@ export interface Account {
   balance?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Account discovery tool
-// ---------------------------------------------------------------------------
-
 const REPORT_ACCOUNTS = 'report_accounts';
 
 const REPORT_TOOL: Tool = {
@@ -40,10 +36,6 @@ const REPORT_TOOL: Tool = {
 
 const TOOLS = [...BROWSER_TOOLS, REPORT_TOOL];
 
-// ---------------------------------------------------------------------------
-// System prompt
-// ---------------------------------------------------------------------------
-
 const SYSTEM_PROMPT = `\
 You are a browser automation agent. The user has just logged into their financial institution and the dashboard is visible.
 
@@ -57,10 +49,6 @@ Steps:
 
 Do not navigate away from the dashboard. Do not click login/logout links.`;
 
-// ---------------------------------------------------------------------------
-// Accounts agent
-// ---------------------------------------------------------------------------
-
 export async function findAccounts(page: Page): Promise<Account[]> {
   console.log('agent: finding accounts...');
 
@@ -69,11 +57,11 @@ export async function findAccounts(page: Page): Promise<Account[]> {
     TOOLS,
     SYSTEM_PROMPT,
     'The user is now logged in. Please find all accounts on the dashboard.',
-    async (name, input) => {
+    async (name, input, pg) => {
       if (name === REPORT_ACCOUNTS) {
         return toolDone<Account[]>((input as { accounts: Account[] }).accounts, 'accounts recorded');
       }
-      return executeBrowserTool(name, input, page);
+      return executeBrowserTool(name, input, pg);
     },
   );
 }

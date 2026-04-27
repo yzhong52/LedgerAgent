@@ -10,6 +10,8 @@ export function debug(...args: unknown[]): void {
   if (DEBUG) console.log(...args);
 }
 
+const client = new Anthropic();
+
 export interface ToolDone<T> {
   done: true;
   value: T;
@@ -21,7 +23,7 @@ export function toolDone<T>(value: T, content: string): ToolDone<T> {
 }
 
 function isDone<T>(r: string | ToolDone<T>): r is ToolDone<T> {
-  return typeof r === 'object' && (r as ToolDone<T>).done === true;
+  return typeof r !== 'string';
 }
 
 export async function runAgent<T>(
@@ -31,7 +33,6 @@ export async function runAgent<T>(
   initialMessage: string,
   onTool: (name: string, input: Record<string, unknown>, page: Page) => Promise<string | ToolDone<T>>,
 ): Promise<T> {
-  const client = new Anthropic();
   const messages: MessageParam[] = [{ role: 'user', content: initialMessage }];
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
@@ -51,21 +52,29 @@ export async function runAgent<T>(
     messages.push({ role: 'assistant', content: response.content });
 
     const toolUses = response.content.filter((b): b is ToolUseBlock => b.type === 'tool_use');
-    if (toolUses.length === 0) break;
+    // tool_choice: 'any' guarantees at least one tool call per response.
+    if (toolUses.length === 0) throw new Error('unexpected: Claude returned no tool calls');
 
     const toolResults: { type: 'tool_result'; tool_use_id: string; content: string }[] = [];
     let result: { value: T } | undefined;
 
     for (const toolUse of toolUses) {
+      // Stub any tool_use blocks that follow the terminal tool — the API requires
+      // one tool_result per tool_use in the conversation history.
+      if (result) {
+        toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: 'skipped' });
+        continue;
+      }
+
       console.log(`[turn ${turn + 1}/${MAX_TURNS}] [tool] ${toolUse.name}`, toolUse.input);
 
-      let output: string;
+      let output = '';
       try {
         const r = await onTool(toolUse.name, toolUse.input as Record<string, unknown>, page);
         if (isDone(r)) {
           toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: r.content });
           result = { value: r.value };
-          break;
+          continue;
         }
         output = r;
       } catch (err) {

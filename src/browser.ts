@@ -76,6 +76,19 @@ export const BROWSER_TOOLS: Tool[] = [
   },
 ];
 
+// Locates an element by ARIA role and accessible name from a tool input.
+export function byRole(page: Page, input: Record<string, unknown>) {
+  return page.getByRole(
+    input.role as Parameters<typeof page.getByRole>[0],
+    { name: input.name as string },
+  );
+}
+
+// SPAs don't fire a second 'load' event during in-app navigation; domcontentloaded is safe.
+async function afterClick(page: Page): Promise<void> {
+  await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+}
+
 export async function executeBrowserTool(
   name: string,
   input: Record<string, unknown>,
@@ -85,38 +98,32 @@ export async function executeBrowserTool(
     case BROWSER_TOOL.SNAPSHOT:
       return page.locator('body').ariaSnapshot();
 
-    case BROWSER_TOOL.CLICK: {
-      const role = input.role as Parameters<typeof page.getByRole>[0];
-      await page.getByRole(role, { name: input.name as string }).click();
-      await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+    case BROWSER_TOOL.CLICK:
+      await byRole(page, input).click();
+      await afterClick(page);
       return `clicked ${input.role} "${input.name}"`;
-    }
 
-    case BROWSER_TOOL.CLICK_TESTID: {
+    case BROWSER_TOOL.CLICK_TESTID:
       await page.getByTestId(input.testId as string).click();
-      await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+      await afterClick(page);
       return `clicked [data-testid="${input.testId}"]`;
-    }
 
     case BROWSER_TOOL.CLICK_TEXT: {
       const exact = input.exact !== false;
       await page.getByText(input.text as string, { exact }).click();
-      await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+      await afterClick(page);
       return `clicked text "${input.text}"`;
     }
 
-    case BROWSER_TOOL.CLICK_JS: {
+    case BROWSER_TOOL.CLICK_JS:
       await page.$eval(input.selector as string, (el: HTMLElement) => el.click());
-      await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+      await afterClick(page);
       return `js-clicked "${input.selector}"`;
-    }
 
-    case BROWSER_TOOL.PRESS_ENTER: {
-      const role = input.role as Parameters<typeof page.getByRole>[0];
-      await page.getByRole(role, { name: input.name as string }).press('Enter');
-      await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+    case BROWSER_TOOL.PRESS_ENTER:
+      await byRole(page, input).press('Enter');
+      await afterClick(page);
       return `pressed Enter on ${input.role} "${input.name}"`;
-    }
 
     default:
       return `unknown tool: ${name}`;

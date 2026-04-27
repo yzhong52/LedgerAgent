@@ -3,16 +3,12 @@ import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import * as fs from 'fs/promises';
 import * as readline from 'readline';
 import { runAgent, toolDone } from './agent';
-import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from './browser';
+import { BROWSER_TOOL, BROWSER_TOOLS, byRole, executeBrowserTool } from './browser';
 
 export interface Credentials {
   email: string;
   password: string;
 }
-
-// ---------------------------------------------------------------------------
-// System prompt
-// ---------------------------------------------------------------------------
 
 function buildSystemPrompt(creds: Credentials): string {
   return `\
@@ -23,8 +19,8 @@ Credentials to use:
   Password:         ${creds.password}
 
 Login flow:
-  1. Identify the login form fields and fill in the credentials above.
-  2. Submit the form.
+  1. An initial accessibility snapshot is already provided — use it to identify the login form fields.
+  2. Fill in the credentials above and submit the form.
   3. If a multi-factor authentication (MFA) or verification code screen appears,
      call request_mfa_code with a short description of what the user should do.
      The tool returns the code the user typed — use the type tool (not fill)
@@ -34,10 +30,6 @@ Login flow:
 Always call snapshot after submitting a form or clicking a button so you can
 see the updated page state before deciding what to do next.`;
 }
-
-// ---------------------------------------------------------------------------
-// Login-specific tools
-// ---------------------------------------------------------------------------
 
 const LOGIN_TOOL = {
   FILL:             'fill',
@@ -93,10 +85,6 @@ const LOGIN_TOOLS: Tool[] = [
 
 const TOOLS = [...BROWSER_TOOLS, ...LOGIN_TOOLS];
 
-// ---------------------------------------------------------------------------
-// Login agent
-// ---------------------------------------------------------------------------
-
 export async function login(page: Page, url: string, creds: Credentials): Promise<void> {
   await page.goto(url, { waitUntil: 'load' });
   const initialSnapshot = await page.locator('body').ariaSnapshot();
@@ -121,14 +109,12 @@ export async function login(page: Page, url: string, creds: Credentials): Promis
       }
 
       if (name === LOGIN_TOOL.FILL) {
-        const role = input.role as Parameters<typeof pg.getByRole>[0];
-        await pg.getByRole(role, { name: input.name as string }).fill(input.value as string);
+        await byRole(pg, input).fill(input.value as string);
         return `filled ${input.role} "${input.name}"`;
       }
 
       if (name === LOGIN_TOOL.TYPE) {
-        const role = input.role as Parameters<typeof pg.getByRole>[0];
-        await pg.getByRole(role, { name: input.name as string }).pressSequentially(input.value as string);
+        await byRole(pg, input).pressSequentially(input.value as string);
         return `typed into ${input.role} "${input.name}"`;
       }
 
@@ -147,10 +133,6 @@ export async function login(page: Page, url: string, creds: Credentials): Promis
 
   console.log('agent: login complete');
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function promptUser(question: string): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
