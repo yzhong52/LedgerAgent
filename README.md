@@ -1,6 +1,9 @@
-# OpenVault
+# OpenVault — Agentic Financial Aggregator
 
-A local-first tool that logs into your financial institutions using a Claude-powered browser agent, extracts account data, and keeps everything on your machine.
+Aggregate accounts, balances, and transactions from any financial institution — without API keys, screen-scraping hacks, or third-party integrations.
+
+- **Universal.** Traditional aggregators break when banks change their UI or revoke API access. OpenVault uses an AI agent that reads the page the same way you do — works out of the box for any bank, any UI, with no setup per institution.
+- **Private.** Your credentials never leave your machine. OpenVault opens a real browser, logs in as you, and saves data locally. No third party ever sees your account information.
 
 ## How It Works
 
