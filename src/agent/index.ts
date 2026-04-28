@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam, Tool, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
 import type { Page } from 'playwright';
 import * as fs from 'fs/promises';
+import { BROWSER_TOOL } from './browser';
 
 export const MODEL = 'claude-sonnet-4-6';
 export const MAX_TURNS = 20;
@@ -73,7 +74,6 @@ export async function runAgent<T>(
       console.log(`🔄 ${turn + 1}/${MAX_TURNS} 🔧 ${toolUse.name}`, toolUse.input);
 
       let output = '';
-      let success = true;
       try {
         const r = await onTool(toolUse.name, toolUse.input as Record<string, unknown>, page);
         if (isDone(r)) {
@@ -82,22 +82,23 @@ export async function runAgent<T>(
           continue;
         }
         output = r;
+
+        const preview = output.length > 240 ? output.slice(0, 240) + '…' : output;
+        if (toolUse.name === BROWSER_TOOL.SNAPSHOT) {
+          const file = `logs/${sessionTag}_${String(++snapCount).padStart(3, '0')}.txt`;
+          await fs.writeFile(file, output);
+          console.log(`✅ snapshot taken:\n${preview}\nSee full snapshot in ${file}`);
+        } else {
+          console.log(`✅ ${preview}`);
+        }
+        
       } catch (err) {
         output = `error: ${err instanceof Error ? err.message : String(err)}`;
-        success = false;
-      }
-
-      const preview = output.length > 240 ? output.slice(0, 240) + '…' : output;
-      if (!success) {
+        const preview = output.length > 480 ? output.slice(0, 480) + '…' : output;
         // Playwright errors contain ANSI colour codes; the reset prevents terminal colour bleed.
         console.log(`❌ ${preview}\x1b[0m`);
-      } else if (toolUse.name === 'snapshot') {
-        const file = `logs/${sessionTag}_${String(++snapCount).padStart(3, '0')}.txt`;
-        await fs.writeFile(file, output);
-        console.log(`✅ snapshot taken:\n${preview}\nSee full snapshot in ${file}`);
-      } else {
-        console.log(`✅ ${preview}`);
       }
+      
       if (DEBUG) await new Promise(resolve => setTimeout(resolve, 1000));
       toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
     }
