@@ -17,6 +17,6 @@ export function openDb(): { db: Db; close: () => void } {
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('foreign_keys = ON');
   const db = drizzle(sqlite, { schema });
-  migrate(db, { migrationsFolder: path.join(process.cwd(), 'drizzle') });
+  migrate(db, { migrationsFolder: path.join(process.cwd(), 'src/db/migrations') });
   return { db, close: () => sqlite.close() };
 }

@@ -5,7 +5,9 @@
       "Bash(cargo test:*)",
       "Bash(cargo run:*)",
       "Bash(cargo search:*)",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

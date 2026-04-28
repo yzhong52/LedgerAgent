@@ -118,6 +118,8 @@ export async function login(page: Page, url: string, creds: Credentials, institu
         const snapshot = await executeBrowserTool(name, input, pg);
         const file = `logs/${sessionTag}_${String(++snapCount).padStart(3, '0')}.txt`;
         await fs.writeFile(file, snapshot);
+        const preview = snapshot.length > 240 ? snapshot.slice(0, 240) + '…' : snapshot;
+        console.log(`snapshot taken:\n${preview}\nsee full snapshot at: ${file}`);
         return snapshot;
       }
 
