@@ -89,6 +89,7 @@ const LOGIN_TOOLS: Tool[] = [
 const TOOLS = [...BROWSER_TOOLS, ...LOGIN_TOOLS];
 
 export async function login(page: Page, url: string, creds: Credentials): Promise<void> {
+  const loginStartedAt = new Date();
   await page.goto(url, { waitUntil: 'load' });
   const initialSnapshot = await page.locator('body').ariaSnapshot();
 
@@ -123,7 +124,7 @@ export async function login(page: Page, url: string, creds: Credentials): Promis
 
       if (name === LOGIN_TOOL.REQUEST_MFA_CODE) {
         console.log(`\n${input.instructions as string}`);
-        const code = await fetchMfaCode() ?? (await promptUser('Code: ')).trim();
+        const code = await fetchMfaCode(loginStartedAt) ?? (await promptUser('Code: ')).trim();
         return code;
       }
 

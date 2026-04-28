@@ -4,9 +4,10 @@ import { loadConfig } from './config';
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS  = 60000;
-const LOOKBACK_MS      = 30 * 1000;
 
-export async function fetchMfaCode(): Promise<string | null> {
+// since is the login start time — only accept emails that arrived after login began,
+// so codes from a previous session are never mistakenly reused.
+export async function fetchMfaCode(since: Date): Promise<string | null> {
   const { gmailAddress } = await loadConfig();
   if (!gmailAddress) return null;
 
@@ -21,7 +22,6 @@ export async function fetchMfaCode(): Promise<string | null> {
     logger: false,
   });
 
-  const since    = new Date(Date.now() - LOOKBACK_MS);
   const deadline = Date.now() + POLL_TIMEOUT_MS;
 
   process.stdout.write('Checking Gmail for MFA code');
