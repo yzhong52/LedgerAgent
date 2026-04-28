@@ -6,7 +6,7 @@ import { findAccounts } from '../tasks/accounts';
 import { keychainLoad } from '../keychain';
 import { openDb } from '../db';
 import { saveSync } from '../db/storage';
-import { prompt, readInstitutions, PROFILE_DIR } from './utils';
+import { prompt, readInstitutions, printAccountsTable, PROFILE_DIR } from './utils';
 
 export function makeSyncCommand(): Command {
   return new Command('sync')
@@ -53,10 +53,11 @@ export function makeSyncCommand(): Command {
           saveSync(db, inst.name, inst.url, accounts);
 
           console.log(`\n${inst.name} accounts:`);
-          for (const account of accounts) {
-            const parts = [account.name, account.type, account.balance].filter(Boolean);
-            console.log(' ', parts.join(' — '));
-          }
+          printAccountsTable(accounts.map(a => ({
+            account: a.name,
+            type:    a.type ?? '—',
+            balance: a.balance ?? '—',
+          })));
         }
       } finally {
         close();

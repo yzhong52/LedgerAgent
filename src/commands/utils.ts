@@ -30,6 +30,58 @@ export function prompt(question: string): Promise<string> {
   return new Promise(resolve => rl.question(question, ans => { rl.close(); resolve(ans); }));
 }
 
+export interface AccountEntry {
+  institution?: string;
+  account: string;
+  type: string;
+  balance: string;
+}
+
+export function printAccountsTable(entries: AccountEntry[]): void {
+  const showInstitution = entries.some(e => e.institution != null);
+  const headers = { account: 'Account', type: 'Type', balance: 'Balance' };
+
+  const width = (key: 'institution' | 'account' | 'type' | 'balance') =>
+    Math.max(
+      key === 'institution' ? 'Institution'.length : headers[key as keyof typeof headers].length,
+      ...entries.map(e => (e[key] ?? '').length),
+    );
+  const w = {
+    institution: showInstitution ? width('institution') : 0,
+    account: width('account'),
+    type: width('type'),
+    balance: width('balance'),
+  };
+
+  const fmt = (e: AccountEntry) => [
+    showInstitution ? (e.institution ?? '').padEnd(w.institution) : null,
+    e.account.padEnd(w.account),
+    e.type.padEnd(w.type),
+    e.balance.padStart(w.balance),
+  ].filter(Boolean).join('  ');
+
+  const header = fmt({
+    institution: 'Institution',
+    account: 'Account',
+    type: 'Type',
+    balance: 'Balance',
+  });
+  const divider = fmt({
+    institution: '-'.repeat(w.institution),
+    account: '-'.repeat(w.account),
+    type: '-'.repeat(w.type),
+    balance: '-'.repeat(w.balance),
+  });
+
+  console.log();
+  console.log(`  ${header}`);
+  console.log(`  ${divider}`);
+  for (const e of entries) {
+    console.log(`  ${fmt(e)}`);
+  }
+  console.log();
+}
+
 export function promptPassword(question: string): Promise<string> {
   process.stdout.write(question);
   process.stdin.setRawMode?.(true);
