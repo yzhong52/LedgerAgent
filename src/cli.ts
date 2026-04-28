@@ -175,14 +175,15 @@ How to generate one:
 More info: faq/how_to_config_gmail_for_mfa.md
 `);
     const existing = await loadConfig();
-    const existingEmail    = existing.gmailAddress ?? '';
-    const existingPassword = existingEmail ? (keychainLoad('gmail', existingEmail) ?? '') : '';
+    const existingEmail = existing.gmailAddress ?? '';
 
     const emailInput = await prompt(
       existingEmail ? `Gmail address [${existingEmail}]: ` : 'Gmail address: ',
     );
     const newEmail = emailInput.trim() || existingEmail;
 
+    // Look up the stored password for whichever email was chosen
+    const existingPassword = newEmail ? (keychainLoad('gmail', newEmail) ?? '') : '';
     const maskedPassword = existingPassword.length >= 2
       ? existingPassword[0] + '*'.repeat(existingPassword.length - 2) + existingPassword.at(-1)
       : existingPassword ? '*'.repeat(existingPassword.length) : '';
