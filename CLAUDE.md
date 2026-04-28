@@ -10,6 +10,7 @@ Logs into financial institution websites using a Claude-powered Playwright agent
 - `src/keychain.ts` — macOS Keychain helpers
 - `src/config.ts` — reads/writes `~/.openvault/config.json` (non-sensitive settings)
 - `src/gmail.ts` — Gmail IMAP polling for automatic MFA code retrieval
+- `src/memory.ts` — per-institution agent memory; records click failures and injects them into future sessions to avoid repeated mistakes
 - `src/storage.ts` — saves sync results to SQLite via Drizzle ORM
 - `src/agent/index.ts` — generic `runAgent()` loop, shared constants
 - `src/agent/browser.ts` — shared Playwright tool definitions and executors
@@ -68,7 +69,7 @@ snapshot → Claude → tool call → execute → snapshot → …
 
 **Why two fill tools:** `fill()` is fast and reliable for text inputs. OTP fields in SPAs often gate the submit button on keystroke events, which `fill()` doesn't fire. `pressSequentially()` simulates real typing.
 
-**Error handling in tool execution:** Playwright errors (e.g. strict mode violations when a locator matches multiple elements) are caught and returned to Claude as the tool result string. Claude can then retry with a more specific selector (e.g. `click_testid`).
+**Error handling in tool execution:** Playwright errors (e.g. strict mode violations when a locator matches multiple elements) are caught and returned to Claude as the tool result string. Claude can then retry with a more specific selector (e.g. `click_testid`). All click tool failures are persisted to `~/.openvault/memory/<institution>.json` and injected into the system prompt on the next session so the agent doesn't repeat the same mistake.
 
 ## Adding a new institution
 
