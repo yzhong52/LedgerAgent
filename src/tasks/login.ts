@@ -5,13 +5,14 @@ import * as readline from 'readline';
 import { runAgent, toolDone } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, byRole, executeBrowserTool } from '../agent/browser';
 import { fetchMfaCode } from '../gmail';
+import { loadLoginMemory, saveLoginMemory, formatMemoryForPrompt, type LoginMemory } from '../memory';
 
 export interface Credentials {
   username: string;
   password: string;
 }
 
-function buildSystemPrompt(creds: Credentials): string {
+function buildSystemPrompt(creds: Credentials, memory: LoginMemory): string {
   return `\
 You are a browser automation agent. Your job is to log into a financial institution website.
 
@@ -31,7 +32,7 @@ Login flow:
   5. Once you can see the account dashboard or portfolio summary, call success.
 
 Always call snapshot after submitting a form or clicking a button so you can
-see the updated page state before deciding what to do next.`;
+see the updated page state before deciding what to do next.${formatMemoryForPrompt(memory)}`;
 }
 
 const LOGIN_TOOL = {
@@ -88,8 +89,16 @@ const LOGIN_TOOLS: Tool[] = [
 
 const TOOLS = [...BROWSER_TOOLS, ...LOGIN_TOOLS];
 
-export async function login(page: Page, url: string, creds: Credentials): Promise<void> {
+const CLICK_TOOLS = new Set<string>([
+  BROWSER_TOOL.CLICK, BROWSER_TOOL.CLICK_TESTID, BROWSER_TOOL.CLICK_TEXT,
+  BROWSER_TOOL.CLICK_JS, BROWSER_TOOL.PRESS_ENTER,
+]);
+
+export async function login(page: Page, url: string, creds: Credentials, institutionName: string): Promise<void> {
   const loginStartedAt = new Date();
+  const memory = await loadLoginMemory(institutionName);
+  const newFailures: LoginMemory['failures'] = [];
+
   await page.goto(url, { waitUntil: 'load' });
   const initialSnapshot = await page.locator('body').ariaSnapshot();
 
@@ -102,7 +111,7 @@ export async function login(page: Page, url: string, creds: Credentials): Promis
   await runAgent<void>(
     page,
     TOOLS,
-    buildSystemPrompt(creds),
+    buildSystemPrompt(creds, memory),
     `The browser has navigated to the login page. Here is the current accessibility snapshot:\n\n${initialSnapshot}`,
     async (name, input, pg) => {
       if (name === BROWSER_TOOL.SNAPSHOT) {
@@ -129,7 +138,18 @@ export async function login(page: Page, url: string, creds: Credentials): Promis
       }
 
       if (name === LOGIN_TOOL.SUCCESS) {
+        await saveLoginMemory(institutionName, { failures: newFailures });
         return toolDone<void>(undefined, 'login complete');
+      }
+
+      // Track click failures so future sessions can skip known-bad selectors
+      if (CLICK_TOOLS.has(name)) {
+        try {
+          return await executeBrowserTool(name, input, pg);
+        } catch (err) {
+          newFailures.push({ tool: name, input, error: err instanceof Error ? err.message : String(err) });
+          throw err;
+        }
       }
 
       return executeBrowserTool(name, input, pg);
