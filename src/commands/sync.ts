@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import { Command } from 'commander';
 import { chromium } from 'playwright';
 import { login } from '../tasks/login';
-import { findAccounts } from '../tasks/accounts';
+import { exploreAccounts } from '../tasks/explore';
 import { keychainLoad } from '../keychain';
 import { openDb } from '../db';
 import { saveSync } from '../db/storage';
@@ -49,7 +49,7 @@ export function makeSyncCommand(): Command {
           console.log(`\nSyncing ${inst.name}...`);
           await login(page, inst.url, { username: inst.username, password }, inst.name);
 
-          const accounts = await findAccounts(page);
+          const accounts = await exploreAccounts(page, inst.name);
           saveSync(db, inst.name, inst.url, accounts);
 
           console.log(`\n${inst.name} accounts:`);

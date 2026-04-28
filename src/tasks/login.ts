@@ -4,14 +4,14 @@ import * as readline from 'readline';
 import { runAgent, toolDone } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, byRole, executeBrowserTool } from '../agent/browser';
 import { fetchMfaCode } from '../gmail';
-import { loadLoginMemory, saveLoginMemory, formatMemoryForPrompt, generateSessionNotes, type LoginMemory, type ToolEvent } from '../memory';
+import { loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt, generateSessionNotes, type ToolEvent } from '../memory';
 
 export interface Credentials {
   username: string;
   password: string;
 }
 
-function buildSystemPrompt(creds: Credentials, memory: LoginMemory): string {
+function buildSystemPrompt(creds: Credentials, notes: string): string {
   return `\
 You are a browser automation agent. Your job is to log into a financial institution website.
 
@@ -31,7 +31,7 @@ Login flow:
   5. Once you can see the account dashboard or portfolio summary, call success.
 
 Always call snapshot after submitting a form or clicking a button so you can
-see the updated page state before deciding what to do next.${formatMemoryForPrompt(memory)}`;
+see the updated page state before deciding what to do next.${formatMemoryForPrompt(notes, 'login')}`;
 }
 
 const LOGIN_TOOL = {
@@ -95,7 +95,7 @@ const CLICK_TOOLS = new Set<string>([
 
 export async function login(page: Page, url: string, creds: Credentials, institutionName: string): Promise<void> {
   const loginStartedAt = new Date();
-  const memory = await loadLoginMemory(institutionName);
+  const notes = await loadMemoryNotes(institutionName, 'login');
   const events: ToolEvent[] = [];
 
   const track = (description: string, outcome: 'success' | 'error', error?: string) =>
@@ -109,7 +109,7 @@ export async function login(page: Page, url: string, creds: Credentials, institu
   await runAgent<void>(
     page,
     TOOLS,
-    buildSystemPrompt(creds, memory),
+    buildSystemPrompt(creds, notes),
     `The browser has navigated to the login page. Here is the current accessibility snapshot:\n\n${initialSnapshot}`,
     async (name, input, pg) => {
       switch (name) {
@@ -129,8 +129,8 @@ export async function login(page: Page, url: string, creds: Credentials, institu
         }
         case LOGIN_TOOL.SUCCESS: {
           console.log('🤖 Summarizing session...');
-          const notes = await generateSessionNotes(events);
-          await saveLoginMemory(institutionName, { notes });
+          const sessionNotes = await generateSessionNotes(events, 'logging into a financial institution website');
+          await saveMemoryNotes(institutionName, 'login', sessionNotes);
           return toolDone<void>(undefined, 'login complete');
         }
         default:

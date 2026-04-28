@@ -19,7 +19,7 @@ Logs into financial institution websites using a Claude-powered Playwright agent
 - `src/agent/index.ts` — generic `runAgent()` loop, shared constants
 - `src/agent/browser.ts` — shared Playwright tool definitions and executors
 - `src/tasks/login.ts` — Claude-powered login agent (institution-agnostic)
-- `src/tasks/accounts.ts` — Claude-powered account discovery agent
+- `src/tasks/explore.ts` — Claude-powered account discovery agent
 - `src/db/schema.ts` — Drizzle table definitions
 - `src/db/index.ts` — DB connection and auto-migration
 - `src/db/storage.ts` — `saveSync()` writes sync results; `listAccounts()` reads accounts with latest balances
