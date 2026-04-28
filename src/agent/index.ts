@@ -83,8 +83,10 @@ export async function runAgent<T>(
         success = false;
       }
 
-      const preview = output.length > 120 ? output.slice(0, 120) + '…' : output;
-      console.log(`         ${success ? '✅' : '❌'} ${preview}`);
+      const preview = output.length > 240 ? output.slice(0, 240) + '…' : output;
+      // Playwright error messages contain ANSI colour codes; truncating mid-sequence leaves the
+      // terminal stuck in that colour. The reset code clears it regardless of where we cut.
+      console.log(`         ${success ? '✅' : '❌'} ${preview}\x1b[0m`);
       if (DEBUG) await new Promise(resolve => setTimeout(resolve, 1000));
       toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
     }
