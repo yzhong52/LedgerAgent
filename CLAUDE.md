@@ -15,7 +15,7 @@ Logs into financial institution websites using a Claude-powered Playwright agent
 - `src/keychain.ts` — macOS Keychain helpers
 - `src/config.ts` — reads/writes `~/.openvault/config.json` (non-sensitive settings)
 - `src/gmail.ts` — Gmail IMAP polling for automatic MFA code retrieval
-- `src/memory.ts` — per-institution agent memory; records click failures and injects them into future sessions to avoid repeated mistakes
+- `src/memory.ts` — per-institution, per-task agent memory; after each task Claude summarizes what worked into `~/.openvault/memory/<institution>.md` and injects it into the next session's system prompt
 - `src/agent/index.ts` — generic `runAgent()` loop, shared constants
 - `src/agent/browser.ts` — shared Playwright tool definitions and executors
 - `src/tasks/login.ts` — Claude-powered login agent (institution-agnostic)
@@ -109,7 +109,7 @@ Run `npm run cli -- institution add`. The login agent is institution-agnostic �
 
 ## Logs
 
-Accessibility snapshots are saved to `~/.openvault/logs/<hostname>_<timestamp>_<n>.txt` after each `snapshot` tool call. These are local-only and useful for debugging selector issues.
+Accessibility snapshots are saved to `logs/<hostname>_<YYYY-MM-DD>_<HHMMSS>/<n>.txt` after each `snapshot` tool call — one folder per agent session, named by host and time. The 10 most recent sessions per host are kept; older ones are pruned automatically.
 
 ## Adding a new task
 

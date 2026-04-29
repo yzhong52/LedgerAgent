@@ -8,7 +8,7 @@ import { LOGS_DIR } from '../db';
 export const MODEL = 'claude-sonnet-4-6';
 export const MAX_TURNS = 20;
 export const DEBUG = process.env.DEBUG === '1';
-const MAX_SNAPSHOTS_PER_HOST = 100;
+const MAX_SESSIONS_PER_HOST = 10;
 
 export function debug(...args: unknown[]): void {
   if (DEBUG) console.log(...args);
@@ -30,22 +30,21 @@ function isDone<T>(r: string | ToolDone<T>): r is ToolDone<T> {
   return typeof r !== 'string';
 }
 
-function snapshotHostPrefix(filename: string): string | null {
-  const match = filename.match(/^(.*)_\d+_\d{3}\.txt$/);
+function sessionHostSlug(folderName: string): string | null {
+  const match = folderName.match(/^(.+)_\d{4}-\d{2}-\d{2}_\d{6}$/);
   return match ? match[1] : null;
 }
 
-async function pruneSnapshotsForHost(hostPrefix: string): Promise<void> {
+async function pruneSessionsForHost(hostSlug: string): Promise<void> {
   const entries = await fs.readdir(LOGS_DIR, { withFileTypes: true }).catch(() => []);
-  const files = entries
-    .filter(entry => entry.isFile())
-    .map(entry => entry.name)
-    .filter(name => snapshotHostPrefix(name) === hostPrefix)
+  const folders = entries
+    .filter(e => e.isDirectory() && sessionHostSlug(e.name) === hostSlug)
+    .map(e => e.name)
     .sort()
     .reverse();
 
-  for (const name of files.slice(MAX_SNAPSHOTS_PER_HOST)) {
-    await fs.unlink(`${LOGS_DIR}/${name}`).catch(() => {});
+  for (const name of folders.slice(MAX_SESSIONS_PER_HOST)) {
+    await fs.rm(`${LOGS_DIR}/${name}`, { recursive: true }).catch(() => {});
   }
 }
 
@@ -57,10 +56,13 @@ export async function runAgent<T>(
   onTool: (name: string, input: Record<string, unknown>, page: Page) => Promise<string | ToolDone<T>>,
 ): Promise<T> {
   const messages: MessageParam[] = [{ role: 'user', content: initialMessage }];
-  const hostPrefix = new URL(page.url()).hostname.replace(/\./g, '_');
-  const sessionTag = hostPrefix + '_' + Date.now();
+  const hostSlug = new URL(page.url()).hostname.replace(/\./g, '_');
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toTimeString().slice(0, 8).replace(/:/g, '');
+  const sessionDir = `${LOGS_DIR}/${hostSlug}_${date}_${time}`;
   let snapCount = 0;
-  await fs.mkdir(LOGS_DIR, { recursive: true });
+  await fs.mkdir(sessionDir, { recursive: true });
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     debug('\n── prompt to claude ──────────────────────────────');
@@ -107,9 +109,9 @@ export async function runAgent<T>(
 
         const preview = output.length > 240 ? output.slice(0, 240) + '…' : output;
         if (toolUse.name === BROWSER_TOOL.SNAPSHOT) {
-          const file = `${LOGS_DIR}/${sessionTag}_${String(++snapCount).padStart(3, '0')}.txt`;
+          const file = `${sessionDir}/${String(++snapCount).padStart(3, '0')}.txt`;
           await fs.writeFile(file, output);
-          await pruneSnapshotsForHost(hostPrefix);
+          await pruneSessionsForHost(hostSlug);
           console.log(`✅ snapshot taken:\n${preview}\nSee full snapshot in ${file}`);
         } else {
           console.log(`✅ ${preview}`);
