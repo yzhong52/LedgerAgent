@@ -163,7 +163,7 @@ export async function executeBrowserTool(
       const jsTarget = input.frame
         ? page.frameLocator(input.frame as string).locator(input.selector as string)
         : page.locator(input.selector as string);
-      await jsTarget.evaluate((el: HTMLElement) => el.click());
+      await jsTarget.first().evaluate((el: HTMLElement) => el.click());
       await afterClick(page);
       return `js-clicked "${input.selector}"`;
     }

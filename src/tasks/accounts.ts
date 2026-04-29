@@ -41,6 +41,7 @@ const TOOLS = [...BROWSER_TOOLS, REPORT_TOOL];
 const TRACKED_TOOLS = new Set<string>([
   BROWSER_TOOL.CLICK, BROWSER_TOOL.CLICK_TESTID, BROWSER_TOOL.CLICK_TEXT,
   BROWSER_TOOL.CLICK_JS, BROWSER_TOOL.FILL_JS, BROWSER_TOOL.PRESS_ENTER,
+  BROWSER_TOOL.FRAME_SNAPSHOT, BROWSER_TOOL.GET_INPUTS,
 ]);
 
 function buildSystemPrompt(notes: string): string {
@@ -67,7 +68,6 @@ export async function exploreAccounts(page: Page, institutionName: string): Prom
   const track = (description: string, outcome: 'success' | 'error', error?: string) =>
     events.push({ description, outcome, error });
 
-  let succeeded = false;
   try {
     return await runAgent<Account[]>(
       page,
@@ -77,7 +77,6 @@ export async function exploreAccounts(page: Page, institutionName: string): Prom
       async (name, input, pg) => {
         if (name === REPORT_ACCOUNTS) {
           track('report_accounts', 'success');
-          succeeded = true;
           return toolDone<Account[]>((input as { accounts: Account[] }).accounts, 'accounts recorded');
         }
 
@@ -100,7 +99,7 @@ export async function exploreAccounts(page: Page, institutionName: string): Prom
     );
   } finally {
     if (events.length > 0) {
-      if (succeeded) console.log('🤖 Summarizing session...');
+      console.log('🤖 Summarizing session...');
       const sessionNotes = await generateSessionNotes(events, 'exploring a financial institution dashboard to discover all accounts');
       await saveMemoryNotes(institutionName, MEMORY_TASK, sessionNotes);
     }
