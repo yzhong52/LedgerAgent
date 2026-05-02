@@ -65,11 +65,11 @@ async function pruneSessionsForHost(hostSlug: string): Promise<void> {
 export interface RunAgentOptions {
   // A PageCache instance for cross-run snapshot caching. When provided, the agent
   // will replay cached actions for known pages instead of calling the API.
+  // Optional so future tasks can opt out of caching if needed; all current tasks pass one.
   pageCache?: PageCache;
-  // The initial page snapshot (already sent in initialMessage). Providing this
-  // enables cache lookups from the very first turn rather than waiting for the
-  // first explicit snapshot tool call.
-  initialSnapshot?: string;
+  // The initial page snapshot embedded in initialMessage. Seeding it here lets
+  // the cache hit on turn 1 without waiting for an explicit snapshot tool call.
+  initialSnapshot: string;
 }
 
 export async function runAgent<T>(

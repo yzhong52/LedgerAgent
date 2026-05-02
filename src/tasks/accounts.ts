@@ -56,7 +56,7 @@ You are a browser automation agent. The user has just logged into their financia
 Your job is to find all accounts on the page — including their names, types (e.g. TFSA, RRSP, chequing, savings), and balances.
 
 Steps:
-1. Call snapshot to see the current page state.
+1. An initial accessibility snapshot is already provided — use it to identify account entries.
 2. Identify all account entries. They typically appear as a list with a label and a dollar amount.
 3. If the accounts are behind a tab or link (e.g. "All accounts", "Holdings"), click it and snapshot again.
 4. Once you have a complete list, call report_accounts with all the accounts you found.
@@ -72,6 +72,7 @@ export async function exploreAccounts(page: Page, institutionName: string): Prom
     loadPageCache(institutionName, MEMORY_TASK),
   ]);
   const events: ToolEvent[] = [];
+  const initialSnapshot = await page.locator('body').ariaSnapshot();
 
   const track = (description: string, outcome: 'success' | 'error', error?: string) =>
     events.push({ description, outcome, error });
@@ -81,7 +82,7 @@ export async function exploreAccounts(page: Page, institutionName: string): Prom
       page,
       TOOLS,
       buildSystemPrompt(notes),
-      'The user is now logged in. Please find all accounts on the dashboard.',
+      `The user is now logged in. Here is the current accessibility snapshot:\n\n${initialSnapshot}`,
       async (name, input, pg) => {
         if (name === REPORT_ACCOUNTS) {
           track('report_accounts', 'success');
@@ -104,7 +105,7 @@ export async function exploreAccounts(page: Page, institutionName: string): Prom
 
         return executeBrowserTool(name, input, pg);
       },
-      { pageCache },
+      { pageCache, initialSnapshot },
     );
   } finally {
     if (events.length > 0) {

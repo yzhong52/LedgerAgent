@@ -77,9 +77,15 @@ function isCacheable(toolName: string, input: Record<string, unknown>): boolean 
   return true;
 }
 
+/** Persists a mapping of page-structure fingerprints to agent actions so that
+ *  repeated runs against the same institution can skip Claude API calls for
+ *  pages the agent has already seen. On a cache hit the stored action is
+ *  replayed directly; on a miss or replay failure the agent falls back to
+ *  Claude and updates the cache with whatever Claude does next. */
 export class PageCache {
   private data: CacheData;
   private filePath: string;
+  /** True when in-memory steps differ from what's on disk; flush() writes and clears it. */
   private dirty = false;
   // Fingerprints that produced a failed replay this run — don't retry them.
   private failedFps = new Set<Fingerprint>();
@@ -89,12 +95,19 @@ export class PageCache {
     this.filePath = filePath;
   }
 
+  /** Look up the cached action for a snapshot. Returns null on a cache miss,
+   *  or if the snapshot's fingerprint was previously marked as failed via
+   *  `failSnapshot()` — in both cases the caller should fall back to Claude. */
   check(snapshot: string): CachedAction | null {
     const h = fp(snapshot);
     if (this.failedFps.has(h)) return null;
     return this.data.steps[h] ?? null;
   }
 
+  /** Record what action Claude chose in response to a snapshot, so it can be
+   *  replayed on the next run. No-ops for non-cacheable tools (e.g. password
+   *  fills, report_accounts). Call this after every real Claude API response,
+   *  not after replays. */
   record(snapshot: string, name: string, input: Record<string, unknown>): void {
     if (!isCacheable(name, input)) return;
     const h = fp(snapshot);
