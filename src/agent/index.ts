@@ -13,9 +13,6 @@ export const DEBUG = process.env.DEBUG === '1';
 export const VERBOSE = process.env.VERBOSE === '1' || DEBUG;
 const MAX_SESSIONS_PER_HOST = 10;
 
-export function debug(...args: unknown[]): void {
-  if (DEBUG) console.log(...args);
-}
 
 let _client: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -88,11 +85,12 @@ export async function runAgent<T>(
   let snapCount = 0;
   await fs.mkdir(sessionDir, { recursive: true });
 
-  for (let turn = 0; turn < MAX_TURNS; turn++) {
-    debug('\n── prompt to claude ──────────────────────────────');
-    debug(JSON.stringify(messages[messages.length - 1], null, 2));
-    debug('──────────────────────────────────────────────────\n');
+  const logFile = `${sessionDir}/conversation.md`;
+  await fs.writeFile(logFile,
+    `# ${hostSlug} ${date} ${time}\n\n## System Prompt\n\n${systemPrompt}\n\n## Initial State\n\n${messages[0].content}\n`,
+  );
 
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
     const response = await getClient().messages.create({
       model: MODEL,
       max_tokens: 1024,
@@ -101,6 +99,12 @@ export async function runAgent<T>(
       tool_choice: { type: 'any' },
       messages,
     });
+
+    const toolCallLog = response.content
+      .filter((b): b is ToolUseBlock => b.type === 'tool_use')
+      .map(t => `**→ ${t.name}** \`${JSON.stringify(t.input)}\``)
+      .join('\n\n');
+    await fs.appendFile(logFile, `\n---\n\n## Turn ${turn + 1}\n\n${toolCallLog}\n`);
 
     messages.push({ role: 'assistant', content: response.content });
 
@@ -182,6 +186,13 @@ export async function runAgent<T>(
         toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: 'skipped' });
       }
     }
+
+    const toolNameById = new Map(toolUses.map(t => [t.id, t.name]));
+    const resultsLog = toolResults
+      .filter(r => r.content !== 'skipped')
+      .map(r => `**← ${toolNameById.get(r.tool_use_id) ?? r.tool_use_id}:** ${r.content}`)
+      .join('\n\n');
+    if (resultsLog) await fs.appendFile(logFile, `\n${resultsLog}\n`);
 
     messages.push({ role: 'user', content: toolResults });
 

@@ -32,7 +32,7 @@ npm run cli -- sync                     # Sync all institutions
 npm run cli -- sync --institution TD    # Sync a single institution by name
 npm run cli -- accounts list            # List all stored accounts and latest balances
 npm run cli -- config gmail             # Configure Gmail for automatic MFA
-DEBUG=1 npm run cli -- sync             # Verbose: logs prompts to Claude + 1s pause per tool call
+DEBUG=1 npm run cli -- sync             # 1s pause per tool call (for watching the browser)
 ```
 
 ## Architecture of login.ts
@@ -109,7 +109,12 @@ Run `npm run cli -- institution add`. The login agent is institution-agnostic �
 
 ## Logs
 
-Accessibility snapshots are saved to `logs/<hostname>_<YYYY-MM-DD>_<HHMMSS>/<n>.txt` after each `snapshot` tool call — one folder per agent session, named by host and time. The 10 most recent sessions per host are kept; older ones are pruned automatically.
+Each agent session writes to `logs/<hostname>_<YYYY-MM-DD>_<HHMMSS>/`:
+
+- `conversation.md` — full conversation log in Markdown: system prompt, tool calls, and results (including page snapshots) for every turn
+- `<n>.txt` — individual accessibility snapshots taken after each action
+
+The 10 most recent sessions per host are kept; older ones are pruned automatically.
 
 ## Adding a new task
 
