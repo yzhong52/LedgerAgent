@@ -4,6 +4,7 @@ import * as path from 'path';
 import { DATA_DIR } from '../db';
 import { ACCOUNT_TOOL, LOGIN_TOOL, TRANSACTION_TOOL } from './tools';
 
+// Bump this whenever the CacheData shape changes — mismatched files are discarded and rebuilt.
 const CACHE_VERSION = 2;
 const VERBOSE = process.env.VERBOSE === '1' || process.env.DEBUG === '1';
 
