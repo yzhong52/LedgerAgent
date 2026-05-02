@@ -2,18 +2,28 @@ import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DATA_DIR } from '../db';
+import { ACCOUNT_TOOL, LOGIN_TOOL } from './tools';
 
 const CACHE_VERSION = 1;
 const VERBOSE = process.env.VERBOSE === '1' || process.env.DEBUG === '1';
 
+/** SHA-256 of a normalized snapshot, truncated to 16 hex characters. */
+type Fingerprint = string;
+
 export interface CachedAction {
+  /** Tool name, e.g. "click", "fill", "snapshot". */
   name: string;
+  /** Tool input as received from the Anthropic API. Keys are parameter names
+   *  and values are strings or booleans — e.g. `{ role: "button", name: "Log in" }`
+   *  for `click`. Typed as `unknown` rather than `any` to require an explicit cast before use. */
   input: Record<string, unknown>;
 }
 
 interface CacheData {
+  /** Incremented when the file format changes; mismatches cause the file to be discarded. */
   version: number;
-  steps: Record<string, CachedAction>;
+  steps: Record<Fingerprint, CachedAction>;
+  /** ISO 8601 timestamp of the last write. Informational only — never read back. */
   updatedAt: string;
 }
 
@@ -44,7 +54,7 @@ const NORMALIZE_RULES: Array<[RegExp, string]> = [
 const SENSITIVE_FIELD_RE = /password|passcode|pin|secret|cvv|ssn/i;
 
 // Tools whose inputs embed live session data that must not be cached verbatim.
-const NON_CACHEABLE_TOOLS = new Set(['report_accounts']);
+const NON_CACHEABLE_TOOLS = new Set<string>([ACCOUNT_TOOL.REPORT_ACCOUNTS]);
 
 export function normalizeSnapshot(snapshot: string): string {
   let s = snapshot;
@@ -52,13 +62,18 @@ export function normalizeSnapshot(snapshot: string): string {
   return s.replace(/\s+/g, ' ').trim();
 }
 
-function fp(snapshot: string): string {
+function fp(snapshot: string): Fingerprint {
+  // Truncate to 16 hex chars (64 bits). Collision probability among N keys is
+  // ~N²/2⁶⁴ — negligible for the ~10–20 distinct pages a typical institution
+  // has. The full 64-char SHA-256 would also work; this just keeps the JSON readable.
   return crypto.createHash('sha256').update(normalizeSnapshot(snapshot)).digest('hex').slice(0, 16);
 }
 
-function isCacheable(name: string, input: Record<string, unknown>): boolean {
-  if (NON_CACHEABLE_TOOLS.has(name)) return false;
-  if ((name === 'fill' || name === 'type') && SENSITIVE_FIELD_RE.test(String(input.name ?? ''))) return false;
+/** Returns false for tools whose inputs contain live data that must not be persisted
+ *  (e.g. password fields, report_accounts with current balances). */
+function isCacheable(toolName: string, input: Record<string, unknown>): boolean {
+  if (NON_CACHEABLE_TOOLS.has(toolName)) return false;
+  if ((toolName === LOGIN_TOOL.FILL || toolName === LOGIN_TOOL.TYPE) && SENSITIVE_FIELD_RE.test(String(input.name))) return false;
   return true;
 }
 
@@ -67,7 +82,7 @@ export class PageCache {
   private filePath: string;
   private dirty = false;
   // Fingerprints that produced a failed replay this run — don't retry them.
-  private failedFps = new Set<string>();
+  private failedFps = new Set<Fingerprint>();
 
   constructor(data: CacheData, filePath: string) {
     this.data = data;

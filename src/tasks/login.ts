@@ -1,9 +1,10 @@
 import type { Page } from 'playwright';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import * as readline from 'readline';
-import { runAgent, toolDone, SUCCESS_TOOL } from '../agent';
+import { runAgent, toolDone } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, byRole, executeBrowserTool } from '../agent/browser';
 import { loadPageCache } from '../agent/cache';
+import { LOGIN_TOOL } from '../agent/tools';
 import { fetchMfaCode } from '../gmail';
 import { loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt, generateSessionNotes, type ToolEvent } from '../memory';
 
@@ -35,12 +36,6 @@ Always call snapshot after submitting a form or clicking a button so you can
 see the updated page state before deciding what to do next.${formatMemoryForPrompt(notes, 'login')}`;
 }
 
-const LOGIN_TOOL = {
-  FILL:             'fill',
-  TYPE:             'type',
-  REQUEST_MFA_CODE: 'request_mfa_code',
-  SUCCESS:          SUCCESS_TOOL,
-} as const;
 
 const LOGIN_TOOLS: Tool[] = [
   {

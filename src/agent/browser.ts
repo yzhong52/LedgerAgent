@@ -1,17 +1,8 @@
 import type { Page } from 'playwright';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
+import { BROWSER_TOOL } from './tools';
 
-export const BROWSER_TOOL = {
-  SNAPSHOT:        'snapshot',
-  FRAME_SNAPSHOT:  'frame_snapshot',
-  GET_INPUTS:      'get_inputs',
-  CLICK:           'click',
-  CLICK_TESTID:    'click_testid',
-  CLICK_TEXT:      'click_text',
-  CLICK_JS:        'click_js',
-  FILL_JS:         'fill_js',
-  PRESS_ENTER:     'press_enter',
-} as const;
+export { BROWSER_TOOL };
 
 export const BROWSER_TOOLS: Tool[] = [
   {
