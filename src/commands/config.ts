@@ -38,7 +38,9 @@ More info: faq/how_to_config_gmail_for_mfa.md
         ? existingPassword[0] + '*'.repeat(existingPassword.length - 2) + existingPassword.at(-1)
         : existingPassword ? '*'.repeat(existingPassword.length) : '';
       const passwordInput = await promptPassword(
-        maskedPassword ? `App Password [${maskedPassword}]: ` : 'App Password (16 chars, no spaces): ',
+        maskedPassword
+          ? `App Password [${maskedPassword}]: `
+          : 'App Password (16 chars, no spaces): ',
       );
       const newPassword = passwordInput.trim() || existingPassword;
 

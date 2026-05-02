@@ -23,7 +23,7 @@ function normalizeNotes(notes: string | undefined): string {
   let trimmed = notes?.trim() ?? '';
   if (!trimmed) return '';
   if (BAD_SUMMARY_PATTERNS.some(pattern => pattern.test(trimmed))) return '';
-  // Strip a leading ## heading if Claude included one — the task name is already the section heading.
+  // Strip a leading ## heading — the task name is already the section heading.
   trimmed = trimmed.replace(/^##[^\n]*\n+/, '').trim();
   return trimmed;
 }
@@ -88,14 +88,19 @@ export async function loadMemoryNotes(institutionName: string, task: string): Pr
   return normalizeNotes(file[task]);
 }
 
-export async function saveMemoryNotes(institutionName: string, task: string, notes: string): Promise<void> {
+export async function saveMemoryNotes(
+  institutionName: string, task: string, notes: string,
+): Promise<void> {
   const normalized = normalizeNotes(notes);
   if (!normalized) return;
   const dir = path.join(DATA_DIR, 'memory');
   await fs.mkdir(dir, { recursive: true });
   const file = await readMemoryFile(institutionName);
   file[task] = normalized;
-  await fs.writeFile(markdownMemoryPath(institutionName), serializeMarkdownMemory(memorySlug(institutionName), file));
+  await fs.writeFile(
+    markdownMemoryPath(institutionName),
+    serializeMarkdownMemory(memorySlug(institutionName), file),
+  );
 }
 
 export function formatMemoryForPrompt(notes: string, task: string): string {
@@ -103,7 +108,9 @@ export function formatMemoryForPrompt(notes: string, task: string): string {
   return `\nNotes from previous ${task} sessions for this institution:\n${notes}`;
 }
 
-export async function generateSessionNotes(events: ToolEvent[], taskContext: string): Promise<string> {
+export async function generateSessionNotes(
+  events: ToolEvent[], taskContext: string,
+): Promise<string> {
   if (events.length === 0) return '';
 
   const transcript = events

@@ -27,7 +27,9 @@ let _client: Anthropic | null = null;
 function getClient(): Anthropic {
   if (!_client) {
     const apiKey = keychainLoadApiKey() ?? process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('Anthropic API key not found. Run: npm run cli -- config anthropic');
+    if (!apiKey) throw new Error(
+      'Anthropic API key not found. Run: npm run cli -- config anthropic',
+    );
     _client = new Anthropic({ apiKey });
   }
   return _client;

@@ -11,7 +11,10 @@ import { prompt, readInstitutions, printAccountsTable, PROFILE_DIR } from './uti
 export function makeSyncCommand(): Command {
   return new Command('sync')
     .description('Login to all saved institutions and sync accounts')
-    .option('-i, --institution <name>', 'Only sync the institution with this name (case-insensitive)')
+    .option(
+      '-i, --institution <name>',
+      'Only sync the institution with this name (case-insensitive)',
+    )
     .option('-v, --verbose', 'Show accessibility snapshots in the terminal')
     .action(async (opts: { institution?: string; verbose?: boolean }) => {
       if (opts.verbose) process.env.VERBOSE = '1';
@@ -20,7 +23,9 @@ export function makeSyncCommand(): Command {
         const filter = opts.institution.toLowerCase();
         institutions = institutions.filter(i => i.name.toLowerCase() === filter);
         if (institutions.length === 0) {
-          console.log(`No institution named "${opts.institution}". Run: npm run cli -- institution add`);
+          console.log(
+            `No institution named "${opts.institution}". Run: npm run cli -- institution add`,
+          );
           return;
         }
       }
@@ -44,7 +49,9 @@ export function makeSyncCommand(): Command {
         for (const inst of institutions) {
           const password = keychainLoad(inst.name, inst.username);
           if (!password) {
-            console.warn(`No password found in Keychain for ${inst.name} (${inst.username}), skipping.`);
+            console.warn(
+              `No password found in Keychain for ${inst.name} (${inst.username}), skipping.`,
+            );
             continue;
           }
 

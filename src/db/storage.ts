@@ -90,7 +90,11 @@ export function saveSync(
         .run();
 
       tx.insert(balances)
-        .values({ accountId, date: today, amountCents: account.balance ? parseCents(account.balance) : null })
+        .values({
+          accountId,
+          date: today,
+          amountCents: account.balance ? parseCents(account.balance) : null,
+        })
         .onConflictDoUpdate({
           target: [balances.accountId, balances.date],
           set: { amountCents: account.balance ? parseCents(account.balance) : null },
