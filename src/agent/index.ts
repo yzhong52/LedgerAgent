@@ -58,8 +58,18 @@ async function pruneSessionsForHost(hostSlug: string): Promise<void> {
 }
 
 // T is the task's return type — e.g. Account[] for exploreAccounts, void for login.
-// onTool returns either a plain string (tool result fed back to Claude) or
-// toolDone(value) to signal completion and carry the final value out of the loop.
+//
+// systemPrompt: persistent instructions passed via the `system` API parameter, visible on every
+//   turn but outside the conversation history. Holds task description, credentials, memory notes.
+//   Example: "You are a browser agent. Log in using Username: foo Password: bar. Call success()
+//   once the dashboard is visible."
+//
+// initialMessage: the first user-role message that starts the conversation, combined internally
+//   with the initial ARIA snapshot of the page.
+//   Example: "The browser has navigated to the login page."
+//
+// onTool: called for each tool use Claude returns. Return a plain string to feed the result back
+//   to Claude, or toolDone(value) to signal completion and carry the final value out of the loop.
 export async function runAgent<T>(
   page: Page,
   tools: Tool[],
@@ -85,11 +95,21 @@ export async function runAgent<T>(
   await fs.mkdir(sessionDir, { recursive: true });
 
   const logFile = `${sessionDir}/conversation.md`;
-  await fs.writeFile(logFile,
-    `# ${hostSlug} ${date} ${time}\n\n## System Prompt\n\n${systemPrompt}\n\n## Initial State\n\n${messages[0].content}\n`,
-  );
+  await fs.writeFile(logFile, `# ${hostSlug} ${date} ${time}\n\n## System Prompt\n\n${systemPrompt}\n\n`);
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
+    const lastMsg = messages[messages.length - 1];
+    const userContent = typeof lastMsg.content === 'string'
+      ? lastMsg.content
+      : (lastMsg.content as Array<{ type: string; content?: string; text?: string }>)
+          .filter(r => !(r.type === 'tool_result' && r.content === 'skipped'))
+          .map(r => r.type === 'text' ? (r.text ?? '') : (r.content ?? ''))
+          .join('\n\n');
+    const turnSep = turn > 0 ? '---\n\n' : '';
+    await fs.appendFile(logFile,
+      `${turnSep}## Turn ${turn}\n\n### User → Agent\n\n${userContent}\n\n### Agent → User\n\n`,
+    );
+
     const response = await getClient().messages.create({
       model: MODEL,
       max_tokens: 1024,
@@ -103,7 +123,7 @@ export async function runAgent<T>(
       .filter((b): b is ToolUseBlock => b.type === 'tool_use')
       .map(t => `**→ ${t.name}** \`${JSON.stringify(t.input)}\``)
       .join('\n\n');
-    await fs.appendFile(logFile, `\n---\n\n## Turn ${turn + 1}\n\n${toolCallLog}\n`);
+    await fs.appendFile(logFile, `${toolCallLog}\n\n`);
 
     messages.push({ role: 'assistant', content: response.content });
 
@@ -139,6 +159,7 @@ export async function runAgent<T>(
             } else {
               console.log(`🔧 ${preview}`);
             }
+            toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
           }
         } catch (err) {
           output = `error: ${err instanceof Error ? err.message : String(err)}`;
@@ -150,32 +171,6 @@ export async function runAgent<T>(
             const errorType = err instanceof Error ? err.constructor.name : String(err);
             console.log(`❌ ${errorType}`);
           }
-        }
-
-        if (!result) {
-          // Automatically append current page state so Claude always has fresh context
-          // without needing to call snapshot explicitly.
-          let snap: string | null = null;
-          for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              snap = await page.locator('body').ariaSnapshot();
-              break;
-            } catch {
-              if (attempt < 2) await new Promise(r => setTimeout(r, 500));
-            }
-          }
-          if (snap === null) throw new Error('Could not snapshot page after 3 attempts');
-          const snapFile = `${sessionDir}/${String(++snapCount).padStart(3, '0')}.txt`;
-          await fs.writeFile(snapFile, snap);
-          await pruneSessionsForHost(hostSlug);
-          if (VERBOSE) {
-            const preview = snap.length > 240 ? snap.slice(0, 240) + '…' : snap;
-            console.log(`📸 Snapshot:\n${preview}\nFull: ${snapFile}`);
-          } else {
-            console.log(`📸 Snapshot`);
-          }
-          output += `\n\nCurrent page state:\n${snap}`;
-
           toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
         }
       } else {
@@ -185,14 +180,40 @@ export async function runAgent<T>(
       }
     }
 
+    let msgContent: MessageParam['content'] = toolResults;
+    if (!result) {
+      // Take one snapshot after all tools in this turn complete, so Claude sees the
+      // cumulative page state rather than intermediate states between tool calls.
+      let snap: string | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          snap = await page.locator('body').ariaSnapshot();
+          break;
+        } catch {
+          if (attempt < 2) await new Promise(r => setTimeout(r, 500));
+        }
+      }
+      if (snap === null) throw new Error('Could not snapshot page after 3 attempts');
+      const snapFile = `${sessionDir}/${String(++snapCount).padStart(3, '0')}.txt`;
+      await fs.writeFile(snapFile, snap);
+      await pruneSessionsForHost(hostSlug);
+      if (VERBOSE) {
+        const preview = snap.length > 240 ? snap.slice(0, 240) + '…' : snap;
+        console.log(`📸 Snapshot:\n${preview}\nFull: ${snapFile}`);
+      } else {
+        console.log(`📸 Snapshot`);
+      }
+      msgContent = [...toolResults, { type: 'text' as const, text: `Current page state:\n${snap}` }];
+    }
+
     const toolNameById = new Map(toolUses.map(t => [t.id, t.name]));
     const resultsLog = toolResults
       .filter(r => r.content !== 'skipped')
       .map(r => `**← ${toolNameById.get(r.tool_use_id) ?? r.tool_use_id}:** ${r.content}`)
       .join('\n\n');
-    if (resultsLog) await fs.appendFile(logFile, `\n${resultsLog}\n`);
+    if (resultsLog) await fs.appendFile(logFile, `${resultsLog}\n\n`);
 
-    messages.push({ role: 'user', content: toolResults });
+    messages.push({ role: 'user', content: msgContent });
 
     if (result) return result.value;
   }
