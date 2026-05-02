@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DATA_DIR } from '../db';
-import { ACCOUNT_TOOL, LOGIN_TOOL } from './tools';
+import { ACCOUNT_TOOL, LOGIN_TOOL, TRANSACTION_TOOL } from './tools';
 
 const CACHE_VERSION = 1;
 const VERBOSE = process.env.VERBOSE === '1' || process.env.DEBUG === '1';
@@ -54,7 +54,10 @@ const NORMALIZE_RULES: Array<[RegExp, string]> = [
 const SENSITIVE_FIELD_RE = /password|passcode|pin|secret|cvv|ssn/i;
 
 // Tools whose inputs embed live session data that must not be cached verbatim.
-const NON_CACHEABLE_TOOLS = new Set<string>([ACCOUNT_TOOL.REPORT_ACCOUNTS]);
+const NON_CACHEABLE_TOOLS = new Set<string>([
+  ACCOUNT_TOOL.REPORT_ACCOUNTS,
+  TRANSACTION_TOOL.REPORT_TRANSACTIONS,
+]);
 
 export function normalizeSnapshot(snapshot: string): string {
   let s = snapshot;
@@ -111,6 +114,8 @@ export class PageCache {
   record(snapshot: string, name: string, input: Record<string, unknown>): void {
     if (!isCacheable(name, input)) return;
     const h = fp(snapshot);
+    const existing = this.data.steps[h];
+    if (existing?.name === name && JSON.stringify(existing.input) === JSON.stringify(input)) return; // unchanged
     this.data.steps[h] = { name, input };
     this.data.updatedAt = new Date().toISOString();
     this.dirty = true;
@@ -141,7 +146,7 @@ export async function loadPageCache(institution: string, task: string): Promise<
       return new PageCache({ version: CACHE_VERSION, steps: {}, updatedAt: new Date().toISOString() }, filePath);
     }
     const count = Object.keys(raw.steps).length;
-    if (VERBOSE) console.log(`📂 Loaded page cache: ${count} entr${count === 1 ? 'y' : 'ies'}`);
+    if (VERBOSE) console.log(`📂 Loaded page cache: ${count} ${count === 1 ? 'entry' : 'entries'}`);
     return new PageCache(raw, filePath);
   } catch {
     return new PageCache({ version: CACHE_VERSION, steps: {}, updatedAt: new Date().toISOString() }, filePath);

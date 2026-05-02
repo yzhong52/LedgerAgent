@@ -2,6 +2,8 @@ import type { Page } from 'playwright';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import { runAgent, toolDone } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
+import { loadPageCache } from '../agent/cache';
+import { TRANSACTION_TOOL } from '../agent/tools';
 import { loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt, generateSessionNotes, type ToolEvent } from '../memory';
 
 export interface Transaction {
@@ -12,7 +14,7 @@ export interface Transaction {
 }
 
 const MEMORY_TASK = 'transactions';
-const REPORT_TRANSACTIONS = 'report_transactions';
+const REPORT_TRANSACTIONS = TRANSACTION_TOOL.REPORT_TRANSACTIONS;
 
 const REPORT_TOOL: Tool = {
   name: REPORT_TRANSACTIONS,
@@ -53,7 +55,7 @@ You are a browser automation agent. The user has just logged into their financia
 Your job is to find recent transactions across all accounts.
 
 Steps:
-1. Call snapshot to see the current page state.
+1. An initial accessibility snapshot is already provided — use it to identify where to find transactions.
 2. Navigate to the transactions or activity section for each account.
 3. Collect all visible transactions — date, description, and amount.
 4. Once you have collected all transactions, call report_transactions.
@@ -65,8 +67,12 @@ Do not navigate away from the institution's site. Do not click login/logout link
 export async function fetchTransactions(page: Page, institutionName: string): Promise<Transaction[]> {
   console.log('🤖 fetching transactions...');
 
-  const notes = await loadMemoryNotes(institutionName, MEMORY_TASK);
+  const [notes, pageCache] = await Promise.all([
+    loadMemoryNotes(institutionName, MEMORY_TASK),
+    loadPageCache(institutionName, MEMORY_TASK),
+  ]);
   const events: ToolEvent[] = [];
+  const initialSnapshot = await page.locator('body').ariaSnapshot();
 
   const track = (description: string, outcome: 'success' | 'error', error?: string) =>
     events.push({ description, outcome, error });
@@ -76,7 +82,7 @@ export async function fetchTransactions(page: Page, institutionName: string): Pr
       page,
       TOOLS,
       buildSystemPrompt(notes),
-      'The user is now logged in. Please find all recent transactions.',
+      `The user is now logged in. Here is the current accessibility snapshot:\n\n${initialSnapshot}`,
       async (name, input, pg) => {
         if (name === REPORT_TRANSACTIONS) {
           track('report_transactions', 'success');
@@ -99,6 +105,7 @@ export async function fetchTransactions(page: Page, institutionName: string): Pr
 
         return executeBrowserTool(name, input, pg);
       },
+      { pageCache, initialSnapshot },
     );
   } finally {
     if (events.length > 0) {

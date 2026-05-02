@@ -25,5 +25,9 @@ export const ACCOUNT_TOOL = {
   REPORT_ACCOUNTS: 'report_accounts',
 } as const;
 
+export const TRANSACTION_TOOL = {
+  REPORT_TRANSACTIONS: 'report_transactions',
+} as const;
+
 /** Shared terminal tool name — tasks call this to signal completion. */
 export const SUCCESS_TOOL = LOGIN_TOOL.SUCCESS;

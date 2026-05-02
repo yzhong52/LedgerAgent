@@ -78,7 +78,7 @@ export async function runAgent<T>(
   systemPrompt: string,
   initialMessage: string,
   onTool: (name: string, input: Record<string, unknown>, page: Page) => Promise<string | ToolDone<T>>,
-  options?: RunAgentOptions,
+  options: RunAgentOptions,
 ): Promise<T> {
   const { pageCache, initialSnapshot } = options ?? {};
   const messages: MessageParam[] = [{ role: 'user', content: initialMessage }];
