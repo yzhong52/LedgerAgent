@@ -4,7 +4,7 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages';
 import type { Page } from 'playwright';
 import * as fs from 'fs/promises';
-import { BROWSER_TOOL, SUCCESS_TOOL, STATE_CHANGING_TOOLS } from './tools';
+import { BROWSER_TOOL, SUCCESS_TOOL } from './tools';
 import { normalizeSnapshot } from './utils/normalizeSnapshot';
 import { PageCache } from './cache';
 import { LOGS_DIR } from '../db';
@@ -77,6 +77,9 @@ export interface RunAgentOptions {
   initialSnapshot: string;
 }
 
+// T is the task's return type — e.g. Account[] for exploreAccounts, void for login.
+// onTool returns either a plain string (tool result fed back to Claude) or
+// toolDone(value) to signal completion and carry the final value out of the loop.
 export async function runAgent<T>(
   page: Page,
   tools: Tool[],
@@ -163,78 +166,86 @@ export async function runAgent<T>(
     // Claude usually returns one tool call per turn for sequential browser interactions,
     // but the API allows multiple — we execute all of them and collect their results.
     for (const toolUse of toolUses) {
-      // Stub any tool_use blocks that follow the terminal tool — the API requires
-      // one tool_result per tool_use in the conversation history.
-      if (result) {
-        toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: 'skipped' });
-        continue;
-      }
-
-      if (toolUse.name === SUCCESS_TOOL) {
-        console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 Mission accomplished`);
-      } else if (VERBOSE) {
-        console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 ${toolUse.name}`, toolUse.input);
-      } else {
-        console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 ${toolUse.name}`);
-      }
-
-      let output = '';
-      try {
-        const r = await onTool(toolUse.name, toolUse.input as Record<string, unknown>, page);
-        if (isDone(r)) {
-          toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: r.content });
-          result = { value: r.value };
-          continue;
-        }
-        output = r;
-
-        const preview = output.length > 240 ? output.slice(0, 240) + '…' : output;
-        if (toolUse.name === BROWSER_TOOL.SNAPSHOT) {
-          pendingSnapshot = output; // available for next turn's cache check
-          const file = `${sessionDir}/${String(++snapCount).padStart(3, '0')}.txt`;
-          await fs.writeFile(file, output);
-          await pruneSessionsForHost(hostSlug);
-          if (VERBOSE) console.log(`🔧 snapshot taken:\n${preview}\nSee full snapshot in ${file}`);
-          else console.log(`🔧 Snapshot taken`);
-        } else if (toolUse.name === BROWSER_TOOL.GET_INPUTS) {
-          if (VERBOSE) console.log(`🔧 Inputs retrieved:\n${preview}`);
-          else console.log(`🔧 Inputs retrieved`);
+      if (!result) {
+        if (toolUse.name === SUCCESS_TOOL) {
+          console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 Mission accomplished`);
+        } else if (VERBOSE) {
+          console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 ${toolUse.name}`, toolUse.input);
         } else {
-          console.log(`🔧 ${preview}`);
-          // Implicitly snapshot after state-changing actions so the next turn can
-          // hit the cache without Claude needing to call snapshot explicitly first.
-          if (pageCache && STATE_CHANGING_TOOLS.has(toolUse.name)) {
-            try {
-              const autoSnap = await page.locator('body').ariaSnapshot();
-              // If the page structure didn't change, the action was a no-op for
-              // caching purposes — invalidate the entry to prevent a replay loop.
-              if (snapshotForCache !== null
-                  && normalizeSnapshot(autoSnap) === normalizeSnapshot(snapshotForCache)) {
-                pageCache.failSnapshot(snapshotForCache);
-              } else {
-                pendingSnapshot = autoSnap;
-              }
-            } catch {
-              // Ignore — cache will just miss on the next turn
+          console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 ${toolUse.name}`);
+        }
+
+        let output = '';
+        try {
+          const r = await onTool(toolUse.name, toolUse.input as Record<string, unknown>, page);
+          if (isDone(r)) {
+            toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: r.content });
+            result = { value: r.value };
+          } else {
+            output = r;
+            const preview = output.length > 240 ? output.slice(0, 240) + '…' : output;
+            if (toolUse.name === BROWSER_TOOL.GET_INPUTS) {
+              if (VERBOSE) console.log(`🔧 Inputs retrieved:\n${preview}`);
+              else console.log(`🔧 Inputs retrieved`);
+            } else {
+              console.log(`🔧 ${preview}`);
             }
+          }
+        } catch (err) {
+          output = `error: ${err instanceof Error ? err.message : String(err)}`;
+          if (replayIds.has(toolUse.id)) replayFailed = true;
+          if (VERBOSE) {
+            const preview = output.length > 480 ? output.slice(0, 480) + '…' : output;
+            // Playwright errors contain ANSI colour codes; '\x1b[0m' prevents colour bleed.
+            console.log(`❌ ${preview}\x1b[0m`);
+          } else {
+            const errorType = err instanceof Error ? err.constructor.name : String(err);
+            console.log(`❌ ${errorType}`);
           }
         }
 
-      } catch (err) {
-        output = `error: ${err instanceof Error ? err.message : String(err)}`;
-        if (replayIds.has(toolUse.id)) replayFailed = true;
-        if (VERBOSE) {
-          const preview = output.length > 480 ? output.slice(0, 480) + '…' : output;
-          // Playwright errors contain ANSI colour codes; '\x1b[0m' prevents colour bleed.
-          console.log(`❌ ${preview}\x1b[0m`);
-        } else {
-          const errorType = err instanceof Error ? err.constructor.name : String(err);
-          console.log(`❌ ${errorType}`);
-        }
-      }
+        if (!result) {
+          // Automatically append current page state so Claude always has fresh context
+          // without needing to call snapshot explicitly.
+          let snap: string | null = null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              snap = await page.locator('body').ariaSnapshot();
+              break;
+            } catch {
+              if (attempt < 2) await new Promise(r => setTimeout(r, 500));
+            }
+          }
+          if (snap === null) throw new Error('Could not snapshot page after 3 attempts');
+          const snapFile = `${sessionDir}/${String(++snapCount).padStart(3, '0')}.txt`;
+          await fs.writeFile(snapFile, snap);
+          await pruneSessionsForHost(hostSlug);
+          if (VERBOSE) {
+            const preview = snap.length > 240 ? snap.slice(0, 240) + '…' : snap;
+            console.log(`📸 Snapshot:\n${preview}\nFull: ${snapFile}`);
+          } else {
+            console.log(`📸 Snapshot`);
+          }
 
-      if (DEBUG) await new Promise(resolve => setTimeout(resolve, 1000));
-      toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
+          // Update pendingSnapshot for the next turn's cache check.
+          // Invalidate if the action was a no-op (page structure didn't change).
+          if (snapshotForCache !== null
+              && normalizeSnapshot(snap) === normalizeSnapshot(snapshotForCache)) {
+            pageCache?.failSnapshot(snapshotForCache);
+          } else {
+            pendingSnapshot = snap;
+          }
+
+          output += `\n\nCurrent page state:\n${snap}`;
+
+          if (DEBUG) await new Promise(resolve => setTimeout(resolve, 1000));
+          toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
+        }
+      } else {
+        // The API requires a tool_result for every tool_use in the conversation history,
+        // even for tool calls that came after the terminal tool in the same response.
+        toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: 'skipped' });
+      }
     }
 
     // Invalidate this snapshot's cache entry for the remainder of the run so

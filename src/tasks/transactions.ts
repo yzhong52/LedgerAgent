@@ -58,7 +58,7 @@ You are a browser automation agent. The user has just logged into their financia
 Your job is to find recent transactions across all accounts.
 
 Steps:
-1. An initial accessibility snapshot is already provided — use it to identify where to find transactions.
+1. The current page state is already provided — identify where to find transactions.
 2. Navigate to the transactions or activity section for each account.
 3. Collect all visible transactions — date, description, and amount.
 4. Once you have collected all transactions, call report_transactions.

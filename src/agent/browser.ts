@@ -6,11 +6,6 @@ export { BROWSER_TOOL };
 
 export const BROWSER_TOOLS: Tool[] = [
   {
-    name: BROWSER_TOOL.SNAPSHOT,
-    description: 'Return the current page accessibility tree. Call this after any navigation or click to see updated state.',
-    input_schema: { type: 'object', properties: {} },
-  },
-  {
     name: BROWSER_TOOL.CLICK,
     description: 'Click an element identified by its ARIA role and accessible name. Pass frame when the element is inside an iframe.',
     input_schema: {
@@ -126,9 +121,6 @@ export async function executeBrowserTool(
   page: Page,
 ): Promise<string> {
   switch (name) {
-    case BROWSER_TOOL.SNAPSHOT:
-      return page.locator('body').ariaSnapshot();
-
     case BROWSER_TOOL.CLICK: {
       const clickLocator = input.frame
         ? page.frameLocator(input.frame as string).getByRole(input.role as Parameters<typeof page.getByRole>[0], { name: input.name as string })

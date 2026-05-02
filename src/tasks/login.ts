@@ -35,8 +35,7 @@ Login flow:
      on future logins.
   5. Once you can see the account dashboard or portfolio summary, call success.
 
-Always call snapshot after submitting a form or clicking a button so you can
-see the updated page state before deciding what to do next.${formatMemoryForPrompt(notes, 'login')}`;
+After each action, the updated page state is provided automatically.${formatMemoryForPrompt(notes, 'login')}`;
 }
 
 const LOGIN_TOOLS: Tool[] = [

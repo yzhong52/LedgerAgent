@@ -12,23 +12,6 @@ Things to reconcile:
 - `DEBUG=1` is env-var only (not wired to a CLI flag)
 - `CLAUDE.md` documents `DEBUG=1` but not `VERBOSE=1`
 
-## Remove snapshot as an explicit tool
-
-Instead of Claude calling `snapshot` to see the page, the agent should automatically
-include the current ARIA snapshot in every tool result — i.e. after executing any
-action, append the updated page state to the response fed back to Claude.
-
-Benefits:
-- Claude always has fresh page context without spending a turn on `snapshot`
-- Eliminates a round-trip per navigation step
-- The `snapshot` tool can be removed from the tool list entirely, simplifying the prompt
-
-Implementation sketch:
-- After each tool call in the `onTool` loop, take an ARIA snapshot (we're already doing
-  this implicitly for caching — reuse that result) and append it to the tool result string
-- Remove `snapshot` from `BROWSER_TOOLS` and its executor in `src/agent/browser.ts`
-- Update system prompts across all tasks to reflect that snapshots are automatic
-
 ## Credential exposure
 
 Passwords are currently sent to the Claude API in plaintext inside the system prompt (`src/tasks/login.ts` → `buildSystemPrompt`). With `VERBOSE=1`, tool inputs are also printed to the console, which can include the password value when Claude calls the `fill` tool.
