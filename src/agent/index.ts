@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { ContentBlock, MessageParam, Tool, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
+import type {
+  ContentBlock, MessageParam, Tool, ToolUseBlock,
+} from '@anthropic-ai/sdk/resources/messages';
 import type { Page } from 'playwright';
 import * as fs from 'fs/promises';
 import { BROWSER_TOOL, SUCCESS_TOOL } from './tools';
@@ -77,10 +79,14 @@ export async function runAgent<T>(
   tools: Tool[],
   systemPrompt: string,
   initialMessage: string,
-  onTool: (name: string, input: Record<string, unknown>, page: Page) => Promise<string | ToolDone<T>>,
+  onTool: (
+    name: string,
+    input: Record<string, unknown>,
+    page: Page,
+  ) => Promise<string | ToolDone<T>>,
   options: RunAgentOptions,
 ): Promise<T> {
-  const { pageCache, initialSnapshot } = options ?? {};
+  const { pageCache, initialSnapshot } = options;
   const messages: MessageParam[] = [{ role: 'user', content: initialMessage }];
   const hostSlug = new URL(page.url()).hostname.replace(/\./g, '_');
   const now = new Date();
@@ -92,7 +98,7 @@ export async function runAgent<T>(
 
   // Snapshot pending for the next cache check. Seeded from initialSnapshot so
   // turn-1 can hit the cache without waiting for an explicit snapshot tool call.
-  let pendingSnapshot: string | null = initialSnapshot ?? null;
+  let pendingSnapshot: string | null = initialSnapshot;
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     // Save snapshot reference before resetting, so replay-failure tracking
@@ -101,13 +107,20 @@ export async function runAgent<T>(
     pendingSnapshot = null;
 
     // --- Cache check / API call ---
-    const cachedAction = pageCache && snapshotForCache !== null ? pageCache.check(snapshotForCache) : null;
+    const cachedAction = pageCache && snapshotForCache !== null
+      ? pageCache.check(snapshotForCache)
+      : null;
     let replayId: string | null = null;
     let assistantContent: ContentBlock[];
 
     if (cachedAction) {
       replayId = `cache_${turn}_${Date.now()}`;
-      assistantContent = [{ type: 'tool_use', id: replayId, name: cachedAction.name, input: cachedAction.input }];
+      assistantContent = [{
+        type: 'tool_use',
+        id: replayId,
+        name: cachedAction.name,
+        input: cachedAction.input,
+      }];
       console.log(`⚡ Replay: ${cachedAction.name}`);
     } else {
       debug('\n── prompt to claude ──────────────────────────────');
@@ -129,7 +142,11 @@ export async function runAgent<T>(
       if (pageCache && snapshotForCache !== null) {
         const toolUse = assistantContent.find((b): b is ToolUseBlock => b.type === 'tool_use');
         if (toolUse) {
-          pageCache.record(snapshotForCache, toolUse.name, toolUse.input as Record<string, unknown>);
+          pageCache.record(
+            snapshotForCache,
+            toolUse.name,
+            toolUse.input as Record<string, unknown>,
+          );
         }
       }
     }
@@ -190,7 +207,7 @@ export async function runAgent<T>(
         if (replayId && toolUse.id === replayId) replayFailed = true;
         if (VERBOSE) {
           const preview = output.length > 480 ? output.slice(0, 480) + '…' : output;
-          // Playwright errors contain ANSI colour codes; the reset '\x1b[0m' prevents terminal colour bleed.
+          // Playwright errors contain ANSI colour codes; '\x1b[0m' prevents colour bleed.
           console.log(`❌ ${preview}\x1b[0m`);
         } else {
           const errorType = err instanceof Error ? err.constructor.name : String(err);

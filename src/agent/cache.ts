@@ -43,6 +43,7 @@ const NORMALIZE_RULES: Array<[RegExp, string]> = [
   // ISO dates  e.g. "2024-01-15"
   [/\d{4}-\d{2}-\d{2}/g, '_DATE_'],
   // Month Day, Year  e.g. "January 15, 2024" or "Jan 15 2024"
+  // (regex is intentionally long — month abbreviation alternation can't be split)
   [/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember))\b\.?\s+\d{1,2},?\s+\d{4}/gi, '_DATE_'],
   // Numeric dates  e.g. "01/15/2024"
   [/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g, '_DATE_'],
@@ -76,8 +77,14 @@ function fp(snapshot: string): Fingerprint {
  *  (e.g. password fields, report_accounts with current balances). */
 function isCacheable(toolName: string, input: Record<string, unknown>): boolean {
   if (NON_CACHEABLE_TOOLS.has(toolName)) return false;
-  if ((toolName === LOGIN_TOOL.FILL || toolName === LOGIN_TOOL.TYPE) && SENSITIVE_FIELD_RE.test(String(input.name))) return false;
+  const isCredentialField = (toolName === LOGIN_TOOL.FILL || toolName === LOGIN_TOOL.TYPE)
+    && SENSITIVE_FIELD_RE.test(String(input.name));
+  if (isCredentialField) return false;
   return true;
+}
+
+function emptyData(): CacheData {
+  return { version: CACHE_VERSION, steps: {}, updatedAt: new Date().toISOString() };
 }
 
 /** Persists a mapping of page-structure fingerprints to agent actions so that
@@ -115,7 +122,9 @@ export class PageCache {
     if (!isCacheable(name, input)) return;
     const h = fp(snapshot);
     const existing = this.data.steps[h];
-    if (existing?.name === name && JSON.stringify(existing.input) === JSON.stringify(input)) return; // unchanged
+    const inputUnchanged = existing?.name === name
+      && JSON.stringify(existing.input) === JSON.stringify(input);
+    if (inputUnchanged) return; // unchanged
     this.data.steps[h] = { name, input };
     this.data.updatedAt = new Date().toISOString();
     this.dirty = true;
@@ -131,7 +140,8 @@ export class PageCache {
     await fs.mkdir(path.dirname(this.filePath), { recursive: true });
     await fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2));
     this.dirty = false;
-    if (VERBOSE) console.log(`💾 Page cache saved (${Object.keys(this.data.steps).length} entries)`);
+    const count = Object.keys(this.data.steps).length;
+    if (VERBOSE) console.log(`💾 Page cache saved (${count} entries)`);
   }
 }
 
@@ -143,12 +153,12 @@ export async function loadPageCache(institution: string, task: string): Promise<
     const raw = JSON.parse(await fs.readFile(filePath, 'utf-8')) as CacheData;
     if (raw.version !== CACHE_VERSION || typeof raw.steps !== 'object') {
       // Stale or corrupt — start fresh.
-      return new PageCache({ version: CACHE_VERSION, steps: {}, updatedAt: new Date().toISOString() }, filePath);
+      return new PageCache(emptyData(), filePath);
     }
     const count = Object.keys(raw.steps).length;
     if (VERBOSE) console.log(`📂 Loaded page cache: ${count} ${count === 1 ? 'entry' : 'entries'}`);
     return new PageCache(raw, filePath);
   } catch {
-    return new PageCache({ version: CACHE_VERSION, steps: {}, updatedAt: new Date().toISOString() }, filePath);
+    return new PageCache(emptyData(), filePath);
   }
 }

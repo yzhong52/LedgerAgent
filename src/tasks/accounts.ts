@@ -4,7 +4,10 @@ import { runAgent, toolDone } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
 import { loadPageCache } from '../agent/cache';
 import { ACCOUNT_TOOL } from '../agent/tools';
-import { loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt, generateSessionNotes, type ToolEvent } from '../memory';
+import {
+  loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
+  generateSessionNotes, type ToolEvent,
+} from '../memory';
 
 export interface Account {
   name: string;
@@ -86,7 +89,8 @@ export async function exploreAccounts(page: Page, institutionName: string): Prom
       async (name, input, pg) => {
         if (name === REPORT_ACCOUNTS) {
           track('report_accounts', 'success');
-          return toolDone<Account[]>((input as { accounts: Account[] }).accounts, 'accounts recorded');
+          const accounts = (input as { accounts: Account[] }).accounts;
+          return toolDone<Account[]>(accounts, 'accounts recorded');
         }
 
         if (TRACKED_TOOLS.has(name)) {
@@ -98,7 +102,8 @@ export async function exploreAccounts(page: Page, institutionName: string): Prom
             track(desc, 'success');
             return result;
           } catch (err) {
-            track(desc, 'error', err instanceof Error ? err.message.split('\n')[0] : String(err));
+            const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+            track(desc, 'error', msg);
             throw err;
           }
         }
@@ -110,7 +115,9 @@ export async function exploreAccounts(page: Page, institutionName: string): Prom
   } finally {
     if (events.length > 0) {
       console.log('🤖 Summarizing session...');
-      const sessionNotes = await generateSessionNotes(events, 'exploring a financial institution dashboard to discover all accounts');
+      const sessionNotes = await generateSessionNotes(
+        events, 'exploring a financial institution dashboard to discover all accounts',
+      );
       await saveMemoryNotes(institutionName, MEMORY_TASK, sessionNotes);
     }
   }

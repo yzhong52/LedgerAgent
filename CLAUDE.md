@@ -118,3 +118,4 @@ Add a new file under `src/tasks/` (e.g. `transactions.ts`). Import `runAgent` fr
 ## Conventions
 
 - **No hardcoded tool name strings.** Tool names that are referenced in multiple places (e.g. `SUCCESS_TOOL` in `src/agent/index.ts`) must be defined as a named constant and imported — never duplicated as string literals.
+- **100-character line width limit.** Keep all code lines at or under 100 characters. Break long function signatures, call arguments, and imports across multiple lines. Exception: string literals inside LLM prompt templates (tool descriptions, system prompt text) are left as-is since they are semantic content, not code.

@@ -6,7 +6,10 @@ import { BROWSER_TOOL, BROWSER_TOOLS, byRole, executeBrowserTool } from '../agen
 import { loadPageCache } from '../agent/cache';
 import { LOGIN_TOOL } from '../agent/tools';
 import { fetchMfaCode } from '../gmail';
-import { loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt, generateSessionNotes, type ToolEvent } from '../memory';
+import {
+  loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
+  generateSessionNotes, type ToolEvent,
+} from '../memory';
 
 export interface Credentials {
   username: string;
@@ -93,7 +96,9 @@ const TRACKED_TOOLS = new Set<string>([
   BROWSER_TOOL.FRAME_SNAPSHOT, BROWSER_TOOL.GET_INPUTS,
 ]);
 
-export async function login(page: Page, url: string, creds: Credentials, institutionName: string): Promise<void> {
+export async function login(
+  page: Page, url: string, creds: Credentials, institutionName: string,
+): Promise<void> {
   const loginStartedAt = new Date();
   const [notes, pageCache] = await Promise.all([
     loadMemoryNotes(institutionName, 'login'),
@@ -146,7 +151,8 @@ export async function login(page: Page, url: string, creds: Credentials, institu
                 track(desc, 'success');
                 return result;
               } catch (err) {
-                track(desc, 'error', err instanceof Error ? err.message.split('\n')[0] : String(err));
+                const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+                track(desc, 'error', msg);
                 throw err;
               }
             }
@@ -158,7 +164,9 @@ export async function login(page: Page, url: string, creds: Credentials, institu
   } finally {
     if (events.length > 0) {
       console.log('🤖 Summarizing session...');
-      const sessionNotes = await generateSessionNotes(events, 'logging into a financial institution website');
+      const sessionNotes = await generateSessionNotes(
+        events, 'logging into a financial institution website',
+      );
       await saveMemoryNotes(institutionName, 'login', sessionNotes);
     }
   }
