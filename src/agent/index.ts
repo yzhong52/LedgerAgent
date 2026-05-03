@@ -102,6 +102,12 @@ export async function runAgent<T>(
   let snapCount = 0;
 
   async function takeSnapshot(): Promise<string> {
+    // Wait for the page to settle before snapshotting. Without this, a snapshot taken
+    // immediately after a click (e.g. clicking Log In) captures the pre-navigation DOM
+    // because domcontentloaded fires before the new page finishes rendering — causing the
+    // agent to see the login page again and incorrectly infer that MFA is needed.
+    // Timeout is intentionally short; if the page stays "busy" we snapshot anyway.
+    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
     let snap: string | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
