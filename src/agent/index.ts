@@ -177,7 +177,7 @@ export async function runAgent<T>(
         if (toolUse.name === SUCCESS_TOOL) {
           console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 Mission accomplished`);
         } else if (VERBOSE) {
-          console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 ${toolUse.name}`, toolUse.input);
+          console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 ${toolUse.name}`, redactSensitive(JSON.stringify(toolUse.input)));
         } else {
           console.log(`🔄 ${turn + 1}/${MAX_TURNS} 💬 ${toolUse.name}`);
         }
