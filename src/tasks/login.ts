@@ -191,6 +191,7 @@ export async function login(
       },
       sessionDir,
       'conversation_login',
+      [creds.username, creds.password],
     );
   } finally {
     if (events.length > 0) {

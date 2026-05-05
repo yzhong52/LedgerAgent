@@ -4,6 +4,7 @@ import type { Page } from 'playwright';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { BROWSER_TOOL, SUCCESS_TOOL } from './tools';
+import { redact } from './redact';
 export { SUCCESS_TOOL } from './tools';
 import { LOGS_DIR } from '../db';
 import { keychainLoadApiKey } from '../keychain';
@@ -87,8 +88,8 @@ export async function createSession(url: string): Promise<string> {
 // onTool: called for each tool use Claude returns. Return a plain string to feed the result back
 //   to Claude, or toolDone(value) to signal completion and carry the final value out of the loop.
 //
-// logSystemPrompt: if provided, written to the log file instead of systemPrompt. Use this to
-//   pass a redacted version when systemPrompt contains sensitive values.
+// sensitiveValues: exact strings to redact from snapshots, tool results, and logs before they
+//   are sent back to the model or written to disk.
 export async function runAgent<T>(
   page: Page,
   tools: Tool[],
@@ -101,9 +102,10 @@ export async function runAgent<T>(
   ) => Promise<string | ToolDone<T>>,
   sessionDir: string,
   logName: string,
-  logSystemPrompt?: string,
+  sensitiveValues: string[] = [],
 ): Promise<T> {
   let snapCount = 0;
+  const redactSensitive = (text: string) => redact(text, sensitiveValues);
 
   async function takeSnapshot(): Promise<string> {
     // Wait for the page to settle before snapshotting. Without this, a snapshot taken
@@ -122,6 +124,7 @@ export async function runAgent<T>(
       }
     }
     if (snap === null) throw new Error('Could not snapshot page after 3 attempts');
+    snap = redactSensitive(snap);
     const snapFile = `${sessionDir}/${String(++snapCount).padStart(3, '0')}.txt`;
     await fs.writeFile(snapFile, snap);
     if (VERBOSE) {
@@ -139,14 +142,14 @@ export async function runAgent<T>(
   }];
 
   const logFile = `${sessionDir}/${logName}.md`;
-  await fs.writeFile(logFile, `# ${path.basename(sessionDir)} — ${logName}\n\n## System Prompt\n\n${logSystemPrompt ?? systemPrompt}\n\n`);
+  await fs.writeFile(logFile, `# ${path.basename(sessionDir)} — ${logName}\n\n## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`);
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const lastMsg = messages[messages.length - 1];
     if (turn > 0) await fs.appendFile(logFile, '---\n\n');
     await fs.appendFile(logFile, `## Turn ${turn}\n\n`);
     await fs.appendFile(logFile, `### User → Agent\n\n`);
-    await fs.appendFile(logFile, `\`\`\`json\n${JSON.stringify(lastMsg.content, null, 2)}\n\`\`\`\n\n`);
+    await fs.appendFile(logFile, `\`\`\`json\n${redactSensitive(JSON.stringify(lastMsg.content, null, 2))}\n\`\`\`\n\n`);
     await fs.appendFile(logFile, `### Agent → User\n\n`);
 
     const response = await getClient().messages.create({
@@ -158,7 +161,7 @@ export async function runAgent<T>(
       messages,
     });
 
-    await fs.appendFile(logFile, `\`\`\`json\n${JSON.stringify(response.content, null, 2)}\n\`\`\`\n\n`);
+    await fs.appendFile(logFile, `\`\`\`json\n${redactSensitive(JSON.stringify(response.content, null, 2))}\n\`\`\`\n\n`);
 
     messages.push({ role: 'assistant', content: response.content });
 
@@ -183,10 +186,14 @@ export async function runAgent<T>(
         try {
           const r = await onTool(toolUse.name, toolUse.input as Record<string, unknown>, page);
           if (isDone(r)) {
-            toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: r.content });
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: redactSensitive(r.content),
+            });
             result = { value: r.value };
           } else {
-            output = r;
+            output = redactSensitive(r);
             const preview = output.length > 240 ? output.slice(0, 240) + '…' : output;
             if (toolUse.name === BROWSER_TOOL.GET_INPUTS) {
               if (VERBOSE) console.log(`🔧 Inputs retrieved:\n${preview}`);
@@ -197,7 +204,7 @@ export async function runAgent<T>(
             toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
           }
         } catch (err) {
-          output = `error: ${err instanceof Error ? err.message : String(err)}`;
+          output = redactSensitive(`error: ${err instanceof Error ? err.message : String(err)}`);
           if (VERBOSE) {
             const preview = output.length > 480 ? output.slice(0, 480) + '…' : output;
             // Playwright errors contain ANSI colour codes; '\x1b[0m' prevents colour bleed.
