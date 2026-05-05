@@ -15,12 +15,48 @@ export const INSTITUTIONS_FILE = path.join(DATA_DIR, 'institutions.json');
 export const PROFILE_DIR =
   process.env.OPENVAULT_PROFILE_DIR ?? path.join(DATA_DIR, 'browser-profile');
 
+async function hasManifest(dir: string): Promise<boolean> {
+  try {
+    const stat = await fs.stat(path.join(dir, 'manifest.json'));
+    return stat.isFile();
+  } catch {
+    return false;
+  }
+}
+
+async function discoverExtensionDirs(dir: string): Promise<string[]> {
+  if (await hasManifest(dir)) return [dir];
+
+  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+  const dirs = await Promise.all(
+    entries
+      .filter(entry => entry.isDirectory())
+      .map(async entry => {
+        const childDir = path.join(dir, entry.name);
+        return await hasManifest(childDir) ? childDir : null;
+      }),
+  );
+  return dirs.filter((dir): dir is string => dir != null);
+}
+
 export async function launchBrowser(): Promise<BrowserContext> {
   await fs.mkdir(PROFILE_DIR, { recursive: true });
+  const extensionDir = path.join(DATA_DIR, 'brower-extensions');
+  await fs.mkdir(extensionDir, { recursive: true });
+  const extensions = await discoverExtensionDirs(extensionDir);
+  const args = ['--disable-blink-features=AutomationControlled'];
+  if (extensions.length > 0) {
+    const extensionList = extensions.join(',');
+    args.push(`--disable-extensions-except=${extensionList}`);
+    args.push(`--load-extension=${extensionList}`);
+  }
+
   return chromium.launchPersistentContext(PROFILE_DIR, {
     headless: false,
-    channel: 'chrome',
-    args: ['--disable-blink-features=AutomationControlled'],
+    channel: 'chromium',
+    args,
+    // Playwright disables extensions by default; remove that flag when loading ours.
+    ignoreDefaultArgs: extensions.length > 0 ? ['--disable-extensions'] : undefined,
   });
 }
 
