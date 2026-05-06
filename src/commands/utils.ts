@@ -4,6 +4,7 @@ import * as readline from 'readline';
 import { chromium } from 'playwright';
 import type { BrowserContext } from 'playwright';
 import { DATA_DIR } from '../db';
+import { applyDemo } from './demo_utils';
 
 export interface Institution {
   name: string;
@@ -62,7 +63,8 @@ export interface AccountEntry {
   balance: string;
 }
 
-export function printAccountsTable(entries: AccountEntry[]): void {
+export function printAccountsTable(entries: AccountEntry[], demo: boolean): void {
+  if (demo) entries = entries.map(applyDemo);
   const showInstitution = entries.some(e => e.institution != null);
   const headers = { account: 'Account', type: 'Type', balance: 'Balance' };
 

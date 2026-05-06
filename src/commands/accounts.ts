@@ -9,7 +9,8 @@ export function makeAccountsCommand(): Command {
   cmd
     .command('list')
     .description('List all accounts and their latest balances')
-    .action(() => {
+    .option('--demo', 'Hide sensitive data by randomizing balances and account numbers')
+    .action((opts: { demo: boolean }) => {
       const { db, close } = openDb();
       try {
         const rows = listAccounts(db);
@@ -25,7 +26,7 @@ export function makeAccountsCommand(): Command {
           balance:     row.amountCents != null
             ? `$${(row.amountCents / 100).toLocaleString('en-CA', { minimumFractionDigits: 2 })}`
             : '—',
-        })));
+        })), opts.demo);
       } finally {
         close();
       }
