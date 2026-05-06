@@ -9,8 +9,22 @@ import {
 } from '../memory';
 
 export const ACCOUNT_TYPES = [
-  'chequing', 'savings', 'TFSA', 'RRSP', 'FHSA', 'RESP', 'RDSP',
-  'credit', 'mortgage', 'investment', 'brokerage', 'cash',
+  'Brokerage',       // Self-directed trading account
+  'Cash',
+  'Chequing',
+  'Credit',
+  'FHSA',            // First Home Savings Account
+  'Investment',      // Managed/robo-advisor account
+  'LIF',             // Life Income Fund
+  'Line of Credit',
+  'LIRA',            // Locked-In Retirement Account
+  'Mortgage',
+  'RDSP',            // Registered Disability Savings Plan
+  'RESP',            // Registered Education Savings Plan
+  'RRIF',            // Registered Retirement Income Fund
+  'RRSP',            // Registered Retirement Savings Plan
+  'Savings',
+  'TFSA',            // Tax-Free Savings Account
 ] as const;
 
 export type AccountType = typeof ACCOUNT_TYPES[number];
@@ -71,7 +85,7 @@ Steps:
 2. They typically appear as a list with a label and a dollar amount.
 3. If accounts are behind a tab or link (e.g. "All accounts", "Holdings"), click it.
 4. Once you have a complete list, call report_accounts with all the accounts you found.
-   - Set "type" to the account category only (e.g. "savings", "chequing", "TFSA") — do not include currency in the type.
+   - Set "type" to the account category only (e.g. "Savings", "Chequing", "TFSA") — do not include currency in the type.
    - Set "currency" to the ISO 4217 code (e.g. "USD") only when the account is in a non-default foreign currency. Omit it for domestic accounts.
 
 Do not navigate away from the dashboard. Do not click login/logout links.${formatMemoryForPrompt(notes, 'accounts')}`;
