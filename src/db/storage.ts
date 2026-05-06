@@ -1,5 +1,6 @@
 import { eq, desc } from 'drizzle-orm';
 import type { Account } from '../tasks/accounts';
+import { ACCOUNT_TYPES } from '../tasks/accounts';
 import { type Db } from '.';
 import { institutions, accounts as accountsTable, syncs, balances } from './schema';
 
@@ -9,6 +10,11 @@ function toDateString(d: Date): string {
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
+function normalizeType(raw: string | undefined): string | undefined {
+  if (!raw) return raw;
+  return ACCOUNT_TYPES.find(t => t.toLowerCase() === raw.toLowerCase()) ?? raw.toLowerCase();
 }
 
 function parseCents(raw: string): number | null {
@@ -88,11 +94,11 @@ export function saveSync(
       const accountId = `${institutionId}/${account.name}`;
 
       tx.insert(accountsTable)
-        .values({ id: accountId, institutionId, name: account.name, type: account.type,
-                  currency: account.currency })
+        .values({ id: accountId, institutionId, name: account.name,
+                  type: normalizeType(account.type), currency: account.currency })
         .onConflictDoUpdate({
           target: accountsTable.id,
-          set: { type: account.type, currency: account.currency },
+          set: { type: normalizeType(account.type), currency: account.currency },
         })
         .run();
 

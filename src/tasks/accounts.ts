@@ -8,9 +8,16 @@ import {
   generateSessionNotes, type ToolEvent,
 } from '../memory';
 
+export const ACCOUNT_TYPES = [
+  'chequing', 'savings', 'TFSA', 'RRSP', 'FHSA', 'RESP', 'RDSP',
+  'credit', 'mortgage', 'investment', 'brokerage', 'cash',
+] as const;
+
+export type AccountType = typeof ACCOUNT_TYPES[number];
+
 export interface Account {
   name: string;
-  type?: string;
+  type?: AccountType;
   currency?: string;
   balance?: string;
 }
@@ -30,7 +37,7 @@ const REPORT_TOOL: Tool = {
           type: 'object',
           properties: {
             name:     { type: 'string', description: 'Account name or label' },
-            type:     { type: 'string', description: 'Account type without currency, e.g. TFSA, RRSP, chequing, savings' },
+            type:     { type: 'string', enum: ACCOUNT_TYPES, description: 'Account category. Pick the closest match from the enum.' },
             currency: { type: 'string', description: 'ISO 4217 currency code if known, e.g. CAD, USD. Omit for default domestic currency.' },
             balance:  { type: 'string', description: 'Current balance as displayed, e.g. "$12,345.67"' },
           },
