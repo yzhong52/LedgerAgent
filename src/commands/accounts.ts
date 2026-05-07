@@ -30,12 +30,7 @@ export function makeAccountsCommand(): Command {
             balance:     row.amountCents != null ? formatCents(row.amountCents) : '—',
           };
         });
-        printAccountsTable(
-          entries,
-          opts.demo,
-          // showInstitution: multiple institutions in one table
-          true,
-        );
+        printAccountsTable(entries, { demo: opts.demo, showInstitution: true });
       } finally {
         close();
       }

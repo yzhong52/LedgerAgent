@@ -73,7 +73,8 @@ export interface AccountEntry {
 }
 
 export function printAccountsTable(
-  entries: AccountEntry[], demo: boolean, showInstitution: boolean,
+  entries: AccountEntry[],
+  { demo, showInstitution }: { demo: boolean; showInstitution: boolean },
 ): void {
   if (demo) entries = entries.map(applyDemo);
   const headers = { account: 'Account', accountId: 'ID', type: 'Type', balance: 'Balance' };

@@ -17,7 +17,7 @@ describe('printAccountsTable', () => {
       { institution: 'Bank A',  account: 'USD Credit Card',   type: 'Credit',   balance: '-$10.00', currency: 'USD' },
       { institution: 'Bank B',  account: 'CAD Savings',       type: 'Savings',  balance: '$500.00', currency: 'CAD' },
       { institution: 'Bank B',  account: 'TFSA',              type: 'TFSA',     balance: '$9,999.99' },
-    ], false);
+    ], { demo: false, showInstitution: true });
 
     expect(output.join('\n')).toMatchInlineSnapshot(`
       "

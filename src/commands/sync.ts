@@ -78,8 +78,8 @@ export function makeSyncCommand(): Command {
             type:        a.type ?? '—',
             currency:    a.currency ?? undefined,
             balance:     a.balance ?? '—',
-          // showInstitution: false — institution already shown as header above
-          })), opts.demo, false);
+          // institution already shown as header above
+          })), { demo: opts.demo, showInstitution: false });
         }
       } catch (err) {
         console.error(`\n❌ ${err instanceof Error ? err.message : String(err)}`);
