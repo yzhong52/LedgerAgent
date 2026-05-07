@@ -7,11 +7,17 @@ export const institutions = sqliteTable('institutions', {
 });
 
 export const accounts = sqliteTable('accounts', {
-  id:            text('id').primaryKey(),
-  institutionId: text('institution_id').notNull().references(() => institutions.id),
-  name:          text('name').notNull(),
-  type:          text('type'),
-  currency:      text('currency'),
+  id:                 text('id').primaryKey(),
+  institutionId:      text('institution_id').notNull().references(() => institutions.id),
+  name:               text('name').notNull(),
+  type:               text('type'),
+  currency:           text('currency'),
+  // Denormalized from balances for O(1) current-balance reads. saveSync keeps these
+  // in sync within the same transaction. Trade-off: the latest balance is stored twice
+  // (here and in balances), but avoids a MAX(date) subquery or time-series join on
+  // every dashboard load.
+  latestDate:         text('latest_date'),
+  latestAmountCents:  integer('latest_amount_cents'),
 });
 
 export const syncs = sqliteTable('syncs', {
