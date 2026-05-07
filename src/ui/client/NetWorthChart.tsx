@@ -14,7 +14,7 @@ export function NetWorthChart({ data }: { data: NetWorthPoint[] }) {
             dataKey="date" 
             tick={{ fill: '#6b7280', fontSize: 12 }}
             tickMargin={10}
-            minTickGap={30}
+            interval={0}
           />
           <YAxis 
             tickFormatter={formatCurrency}
@@ -24,7 +24,7 @@ export function NetWorthChart({ data }: { data: NetWorthPoint[] }) {
             tickMargin={10}
           />
           <Tooltip 
-            formatter={(value: number) => [formatCurrency(value), 'Net Worth']}
+            formatter={(value: any) => [formatCurrency(Number(value) || 0), 'Net Worth']}
             labelFormatter={(label) => `Date: ${label}`}
             contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
           />
