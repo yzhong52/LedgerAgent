@@ -1,13 +1,6 @@
-import React from 'react';
 import type { AccountRow } from './api';
 
 export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
-    const sorted = [...accounts].sort((a, b) => {
-        const instCmp = a.institutionName.localeCompare(b.institutionName);
-        if (instCmp !== 0) return instCmp;
-        return a.accountName.localeCompare(b.accountName);
-    });
-
     const formatCurrency = (cents: number | null, currency: string | null) => {
         if (cents === null) return '—';
         const val = Math.abs(cents) / 100;
@@ -27,7 +20,7 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                 </tr>
             </thead>
             <tbody>
-                {sorted.map((a) => (
+                {accounts.map((a) => (
                     <tr key={`${a.institutionName}-${a.accountName}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
                         <td style={{ padding: '12px 8px' }}>{a.institutionName}</td>
                         <td style={{ padding: '12px 8px' }}>{a.accountName}</td>
