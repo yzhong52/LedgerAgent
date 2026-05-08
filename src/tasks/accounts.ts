@@ -34,7 +34,7 @@ export interface Account {
   accountId?: string;
   type?: AccountType;
   currency?: string;
-  balance?: string;
+  balance?: number;
 }
 
 const MEMORY_TASK = 'accounts';
@@ -55,8 +55,7 @@ const REPORT_TOOL: Tool = {
             accountId:{ type: 'string', description: 'A unique account number or identifier if visible (e.g., the last 4 digits). Omit if not visible.' },
             type:     { type: 'string', enum: ACCOUNT_TYPES, description: 'Account category. Pick the closest match from the enum.' },
             currency: { type: 'string', description: 'ISO 4217 currency code if known, e.g. CAD, USD. Omit for default domestic currency.' },
-            // TODO: balance should be number
-            balance:  { type: 'string', description: 'Current balance as displayed, e.g. "$12,345.67"' },
+            balance:  { type: 'number', description: 'Current balance as a plain number, e.g. 12345.67 or -500. Omit currency symbols and commas.' },
           },
           required: ['name'],
         },

@@ -18,12 +18,6 @@ function normalizeType(raw: string | undefined): string | undefined {
   return ACCOUNT_TYPES.find(t => t.toLowerCase() === raw.toLowerCase()) ?? raw.toLowerCase();
 }
 
-function parseCents(raw: string): number | null {
-  // Handles "$12,345.67", "-$500", "($1,200.00)"
-  const cleaned = raw.replace(/[$,\s]/g, '').replace(/^\((.+)\)$/, '-$1');
-  const n = parseFloat(cleaned);
-  return isNaN(n) ? null : Math.round(n * 100);
-}
 
 export interface AccountRow {
   institutionName: string;
@@ -80,7 +74,7 @@ export function saveSync(
       // institutionId prefix ensures global uniqueness — account names are only unique within an institution
       const accountId = `${institutionId}/${account.accountId ?? account.name}`;
 
-      const amountCents = account.balance ? parseCents(account.balance) : null;
+      const amountCents = account.balance != null ? Math.round(account.balance * 100) : null;
 
       tx.insert(accountsTable)
         .values({
