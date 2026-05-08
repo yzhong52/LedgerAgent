@@ -13,19 +13,19 @@ export interface NetWorthPoint {
   amountCents: number;
 }
 
-// TODO: If adding a client-side router, this static module-level initialization won't
-// react to history changes without a hard refresh. Move into a hook if needed later.
-const demoValue = new URLSearchParams(window.location.search).get('demo');
-const demoParam = (demoValue === 'poor' || demoValue === 'rich') ? `?demo=${demoValue}` : '';
+function getDemoParam(): string {
+  const value = new URLSearchParams(window.location.search).get('demo');
+  return (value === 'poor' || value === 'rich') ? `?demo=${value}` : '';
+}
 
 export async function fetchAccounts(): Promise<AccountRow[]> {
-  const res = await fetch(`/api/accounts${demoParam}`);
+  const res = await fetch(`/api/accounts${getDemoParam()}`);
   if (!res.ok) throw new Error('Failed to fetch accounts');
   return res.json();
 }
 
 export async function fetchNetWorth(): Promise<NetWorthPoint[]> {
-  const res = await fetch(`/api/net-worth${demoParam}`);
+  const res = await fetch(`/api/net-worth${getDemoParam()}`);
   if (!res.ok) throw new Error('Failed to fetch net worth history');
   return res.json();
 }
