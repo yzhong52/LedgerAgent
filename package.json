@@ -5,6 +5,7 @@
   "scripts": {
     "cli": "tsx src/cli.ts",
     "ui": "tsx scripts/build-ui.ts",
+    "dev": "tsx scripts/build-ui.ts --watch",
     "db:generate": "drizzle-kit generate",
     "test": "vitest run"
   },

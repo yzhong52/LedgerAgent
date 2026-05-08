@@ -19,15 +19,17 @@ export function Icon({ name, size = 16 }: IconProps) {
         <circle cx="8" cy="9" r="1.5" fill="currentColor"/>
       </svg>
     ),
-    sync: (
-      <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-        <path d="M14 8A6 6 0 1 1 8 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        <path d="M14 2v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    ),
     chevron: (
       <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
         <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+    demo: (
+      <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+        <path d="M6 1.5h4M6 1.5V6L2.5 13h11L10 6V1.5"
+              stroke="currentColor" strokeWidth="1.5"
+              strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="7" cy="10.5" r="1" fill="currentColor" opacity=".6"/>
       </svg>
     ),
   };

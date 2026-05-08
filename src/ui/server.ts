@@ -1,5 +1,5 @@
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { openDb } from '../db';
@@ -133,38 +133,18 @@ app.get('/dist/bundle.js', async (c) => {
   }
 });
 
-app.get('/', (c) => {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenVault</title>
-  <link rel="icon" type="image/png" href="/favicon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #root { height: 100%; }
-    body {
-      font-family: 'DM Sans', sans-serif;
-      background: oklch(0.975 0.004 60);
-      color: oklch(0.15 0.01 260);
-      -webkit-font-smoothing: antialiased;
-    }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: oklch(0.85 0.005 260); border-radius: 3px; }
-  </style>
-</head>
-<body>
-  <div id="root"></div>
-  <script src="/dist/bundle.js"></script>
-</body>
-</html>`;
-  
-  return c.html(html);
-});
+async function serveIndex(c: Context) {
+  const htmlPath = path.join(process.cwd(), 'src/ui/public/index.html');
+  try {
+    const content = await fs.readFile(htmlPath, 'utf8');
+    return c.html(content);
+  } catch {
+    return c.text('index.html not found.', 404);
+  }
+}
+
+app.get('/', (c) => serveIndex(c));
+app.get('/accounts', (c) => serveIndex(c));
 
 const port = 3000;
 console.log(`Starting OpenVault UI server on http://localhost:${port}`);

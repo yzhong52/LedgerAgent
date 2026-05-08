@@ -48,6 +48,19 @@ function toMonthly(history: NetWorthPoint[]) {
     }));
 }
 
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{
+      background: '#fff', border: '1px solid oklch(0.91 0.005 260)',
+      borderRadius: 8, padding: '8px 14px', fontSize: 13,
+    }}>
+      <div style={{ fontWeight: 500, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontFamily: "'DM Mono', monospace" }}>{fmtCentsK(payload[0].value)}</div>
+    </div>
+  );
+}
+
 interface Props {
   accounts: AccountRow[];
   history: NetWorthPoint[];
@@ -74,19 +87,6 @@ export function Dashboard({ accounts, history }: Props) {
   const debtCents     = debtAccounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
   const chartData     = toMonthly(history);
   const institutions  = Array.from(new Set(accounts.map(a => a.institutionName)));
-
-  const ChartTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div style={{
-        background: '#fff', border: '1px solid oklch(0.91 0.005 260)',
-        borderRadius: 8, padding: '8px 14px', fontSize: 13,
-      }}>
-        <div style={{ fontWeight: 500, marginBottom: 2 }}>{label}</div>
-        <div style={{ fontFamily: "'DM Mono', monospace" }}>{fmtCentsK(payload[0].value)}</div>
-      </div>
-    );
-  };
 
   return (
     <div style={{ padding: '32px 36px', maxWidth: 1100, margin: '0 auto' }}>

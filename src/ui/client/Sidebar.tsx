@@ -1,10 +1,13 @@
 import { Icon } from './Icons';
+import { type DemoMode } from './api';
 
 type Page = 'dashboard' | 'accounts';
 
 interface SidebarProps {
   page: Page;
   setPage: (page: Page) => void;
+  demo: DemoMode;
+  setDemo: (demo: DemoMode) => void;
 }
 
 const NAV: { id: Page; label: string; icon: string }[] = [
@@ -14,7 +17,17 @@ const NAV: { id: Page; label: string; icon: string }[] = [
 
 const ACCENT = 260;
 
-export function Sidebar({ page, setPage }: SidebarProps) {
+const DEMO_CYCLE: DemoMode[] = [null, 'rich', 'poor'];
+const DEMO_LABEL: Record<NonNullable<DemoMode>, string> = { rich: 'Rich', poor: 'Poor' };
+const DEMO_BG:    Record<NonNullable<DemoMode>, string> = { rich: 'oklch(0.93 0.07 145)', poor: 'oklch(0.93 0.07 20)' };
+const DEMO_BG_HV: Record<NonNullable<DemoMode>, string> = { rich: 'oklch(0.88 0.09 145)', poor: 'oklch(0.88 0.09 20)' };
+const DEMO_FG:    Record<NonNullable<DemoMode>, string> = { rich: 'oklch(0.38 0.14 145)', poor: 'oklch(0.42 0.15 20)' };
+
+export function Sidebar({ page, setPage, demo, setDemo }: SidebarProps) {
+  function cycleDemo() {
+    const next = DEMO_CYCLE[(DEMO_CYCLE.indexOf(demo) + 1) % DEMO_CYCLE.length];
+    setDemo(next);
+  }
   return (
     <div style={{
       width: 220, minHeight: '100vh',
@@ -58,18 +71,28 @@ export function Sidebar({ page, setPage }: SidebarProps) {
 
       <div style={{ padding: '12px 8px', borderTop: '1px solid oklch(0.93 0.005 260)' }}>
         <button
+          onClick={cycleDemo}
+          title="Cycle demo mode: off → rich → poor"
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             width: '100%', padding: '8px 12px',
             borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left',
-            fontFamily: 'inherit', fontSize: 13, background: 'transparent',
-            color: 'oklch(0.55 0.01 260)',
+            fontFamily: 'inherit', fontSize: 13,
+            background: demo ? DEMO_BG[demo] : 'transparent',
+            color: demo ? DEMO_FG[demo] : 'oklch(0.55 0.01 260)',
+            transition: 'background 0.12s, color 0.12s',
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'oklch(0.95 0.005 260)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background =
+              demo ? DEMO_BG_HV[demo] : 'oklch(0.95 0.005 260)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background =
+              demo ? DEMO_BG[demo] : 'transparent';
+          }}
         >
-          <Icon name="sync" size={15}/>
-          Sync all
+          <Icon name="demo" size={15}/>
+          {demo ? `Demo: ${DEMO_LABEL[demo]}` : 'Demo: Off'}
         </button>
       </div>
     </div>
