@@ -33,3 +33,13 @@ export const balances = sqliteTable('balances', {
   date:        text('date').notNull(),  // YYYY-MM-DD; one row per account per day
   amountCents: integer('amount_cents'),
 }, t => [uniqueIndex('balances_account_date').on(t.accountId, t.date)]);
+
+export const transactions = sqliteTable('transactions', {
+  id:            integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  accountId:     integer('account_id', { mode: 'number' }).notNull().references(() => accounts.id),
+  transactionId: text('transaction_id').notNull(),  // institution ID or sha256 hash of (accountId:date:description:amountCents)
+  date:          text('date').notNull(),             // YYYY-MM-DD
+  description:   text('description').notNull(),
+  amountCents:   integer('amount_cents').notNull(),  // signed; negative = debit
+  currency:      text('currency'),
+}, t => [uniqueIndex('transactions_account_txid').on(t.accountId, t.transactionId)]);

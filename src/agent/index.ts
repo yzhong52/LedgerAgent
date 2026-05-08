@@ -103,6 +103,7 @@ export async function runAgent<T>(
   sessionDir: string,
   logName: string,
   sensitiveValues: string[] = [],
+  maxTurns: number = MAX_TURNS,
 ): Promise<T> {
   let snapCount = 0;
   const redactSensitive = (text: string) => redact(text, sensitiveValues);
@@ -145,7 +146,7 @@ export async function runAgent<T>(
   const logFile = `${sessionDir}/${logName}.md`;
   await fs.writeFile(logFile, `# ${path.basename(sessionDir)} — ${logName}\n\n## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`);
 
-  for (let turn = 0; turn < MAX_TURNS; turn++) {
+  for (let turn = 0; turn < maxTurns; turn++) {
     const lastMsg = messages[messages.length - 1];
     if (turn > 0) await fs.appendFile(logFile, '---\n\n');
     await fs.appendFile(logFile, `## Turn ${turn}\n\n`);
@@ -232,5 +233,5 @@ export async function runAgent<T>(
     }
   }
 
-  throw new Error(`agent did not complete within ${MAX_TURNS} turns`);
+  throw new Error(`agent did not complete within ${maxTurns} turns`);
 }

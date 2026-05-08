@@ -7,20 +7,25 @@ import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
   generateSessionNotes, type ToolEvent,
 } from '../memory';
+import type { Account } from './accounts';
 
 export interface Transaction {
-  date: string;
+  date: string;           // YYYY-MM-DD
   description: string;
-  amount: string;
-  accountName: string;
+  amount: number;         // signed float; negative = debit
+  transactionId?: string; // institution-provided ID if visible
+  currency?: string;      // ISO 4217; omit for domestic
 }
 
 const MEMORY_TASK = 'transactions';
 const REPORT_TRANSACTIONS = TRANSACTION_TOOL.REPORT_TRANSACTIONS;
+const MAX_TURNS = 40;
 
 const REPORT_TOOL: Tool = {
   name: REPORT_TRANSACTIONS,
-  description: 'Report all transactions you found. Call this once you have collected all recent transactions for the account.',
+  description:
+    'Report all transactions you found. Call this once you have collected all transactions ' +
+    'for the requested date range — including any paginated results.',
   input_schema: {
     type: 'object',
     properties: {
@@ -29,12 +34,31 @@ const REPORT_TOOL: Tool = {
         items: {
           type: 'object',
           properties: {
-            date:        { type: 'string', description: 'Transaction date as displayed, e.g. "2025-04-28"' },
-            description: { type: 'string', description: 'Transaction description or merchant name' },
-            amount:      { type: 'string', description: 'Transaction amount as displayed, e.g. "-$12.50" or "+$1,000.00"' },
-            accountName: { type: 'string', description: 'Name of the account this transaction belongs to' },
+            date: {
+              type: 'string',
+              description: 'Transaction date in YYYY-MM-DD format.',
+            },
+            description: {
+              type: 'string',
+              description: 'Merchant or payee name as it appears on the statement.',
+            },
+            amount: {
+              type: 'number',
+              description:
+                'Signed amount as a plain number. Negative for debits (money out), ' +
+                'positive for credits (money in). No currency symbols or commas.',
+            },
+            transactionId: {
+              type: 'string',
+              description:
+                'Institution-provided transaction ID if visible on the page. Omit if not shown.',
+            },
+            currency: {
+              type: 'string',
+              description: 'ISO 4217 code (e.g. USD). Omit for domestic currency.',
+            },
           },
-          required: ['date', 'description', 'amount', 'accountName'],
+          required: ['date', 'description', 'amount'],
         },
       },
     },
@@ -50,26 +74,52 @@ const TRACKED_TOOLS = new Set<string>([
   BROWSER_TOOL.FRAME_SNAPSHOT, BROWSER_TOOL.GET_INPUTS,
 ]);
 
-function buildSystemPrompt(notes: string): string {
-  return `\
-You are a browser automation agent. The user has just logged into their financial institution and the dashboard is visible.
+function buildSystemPrompt(
+  notes: string,
+  account: Pick<Account, 'name' | 'accountId'>,
+  lookbackDays: number,
+  sinceDate: string,
+): string {
+  const accountLabel = account.accountId
+    ? `"${account.name}" (ID: ${account.accountId})`
+    : `"${account.name}"`;
 
-Your job is to find recent transactions across all accounts.
+  return `\
+You are a browser automation agent. The user is logged into their financial institution.
+
+Your job is to find all transactions for the account ${accountLabel} from ${sinceDate} to today \
+(the last ${lookbackDays} days).
 
 Steps:
-1. The current page state is already provided — identify where to find transactions.
-2. Navigate to the transactions or activity section for each account.
-3. Collect all visible transactions — date, description, and amount.
-4. Once you have collected all transactions, call report_transactions.
+1. Navigate to the transaction history for this account. It may require clicking the account name, \
+a "Transactions" or "Activity" tab, or a date-range filter.
+2. Make sure the date range covers from ${sinceDate} to today. If there is a date filter, set it \
+accordingly. If the default range already covers this period, that is fine.
+3. Collect every transaction visible on the page.
+4. If there is pagination (e.g. "Load more", "Next page", numbered pages), continue until you \
+have collected all transactions back to ${sinceDate}.
+5. Once you have everything, call ${REPORT_TRANSACTIONS} with the full list.
+   - "amount" must be a signed number: negative for money leaving the account (purchases, \
+withdrawals, fees), positive for money entering (deposits, refunds).
+   - "date" must be YYYY-MM-DD.
+   - "transactionId" should be included only if the institution shows a reference number or ID.
 
-Do not navigate away from the institution's site. Do not click login/logout links.${formatMemoryForPrompt(notes, 'transactions')}`;
+Do not navigate to other accounts. Do not log out.
+${formatMemoryForPrompt(notes, MEMORY_TASK)}`;
 }
 
-// TODO: implement fetchTransactions and integrate it into the sync pipeline (src/commands/sync.ts)
 export async function fetchTransactions(
-  page: Page, institutionName: string, sessionDir: string,
+  page: Page,
+  institutionName: string,
+  account: Pick<Account, 'name' | 'accountId'>,
+  lookbackDays: number,
+  sessionDir: string,
 ): Promise<Transaction[]> {
-  console.log('🤖 fetching transactions...');
+  console.log(`🤖 Fetching transactions for ${account.name}...`);
+
+  const sinceDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
 
   const notes = await loadMemoryNotes(institutionName, MEMORY_TASK);
   const events: ToolEvent[] = [];
@@ -81,13 +131,13 @@ export async function fetchTransactions(
     return await runAgent<Transaction[]>(
       page,
       TOOLS,
-      buildSystemPrompt(notes),
-      'The user is now logged in.',
+      buildSystemPrompt(notes, account, lookbackDays, sinceDate),
+      `Please fetch transactions for account ${account.name} from ${sinceDate} to today.`,
       async (name, input, pg) => {
         if (name === REPORT_TRANSACTIONS) {
           track('report_transactions', 'success');
-          const transactions = (input as { transactions: Transaction[] }).transactions;
-          return toolDone<Transaction[]>(transactions, 'transactions recorded');
+          const txs = (input as { transactions: Transaction[] }).transactions;
+          return toolDone<Transaction[]>(txs, 'transactions recorded');
         }
 
         if (TRACKED_TOOLS.has(name)) {
@@ -108,13 +158,16 @@ export async function fetchTransactions(
         return executeBrowserTool(name, input, pg);
       },
       sessionDir,
-      'conversation_transactions',
+      `conversation_transactions_${account.name.toLowerCase().replace(/\s+/g, '_')}`,
+      [],
+      MAX_TURNS,
     );
   } finally {
     if (events.length > 0) {
       console.log('🤖 Summarizing session...');
       const sessionNotes = await generateSessionNotes(
-        events, 'fetching recent transactions from a financial institution',
+        events,
+        `fetching transactions for account "${account.name}" at ${institutionName}`,
       );
       await saveMemoryNotes(institutionName, MEMORY_TASK, sessionNotes);
     }
