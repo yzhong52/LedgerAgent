@@ -61,8 +61,11 @@ export function makeAccountsCommand(): Command {
         let tgtIdx: number;
         do {
           tgtIdx = await selectFromList(labels, 'Target account to merge INTO:');
-          if (tgtIdx === srcIdx) console.log('  Source and target must be different. Try again.');
-        } while (tgtIdx === srcIdx);
+          if (tgtIdx === srcIdx)
+            console.log('  Source and target must be different. Try again.');
+          else if (rows[tgtIdx].institutionName !== rows[srcIdx].institutionName)
+            console.log('  Cannot merge accounts across institutions. Try again.');
+        } while (tgtIdx === srcIdx || rows[tgtIdx].institutionName !== rows[srcIdx].institutionName);
 
         const src = rows[srcIdx];
         const tgt = rows[tgtIdx];
