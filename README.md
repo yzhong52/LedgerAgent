@@ -46,13 +46,19 @@ List the latest stored balances:
 npm run cli -- accounts list
 ```
 
+List recent transactions:
+
+```bash
+npm run cli -- transactions list
+```
+
 ## Local storage
 
 OpenVault stores all data on your machine:
 
 - Institution metadata is saved in `~/.openvault/accounts.json`
 - Passwords are saved in macOS Keychain
-- Synced balances are saved in `~/.openvault/data.db`
+- Synced balances and transactions are saved in `~/.openvault/data.db`
 - Browser session state is saved in `~/.openvault/browser-profile`
 - Per-institution agent memory is saved in `~/.openvault/memory/`
 - Debug snapshots are saved in `~/.openvault/logs/`
@@ -63,6 +69,7 @@ Each sync runs a three-step agent pipeline per institution:
 
 1. **Login** (`src/tasks/login.ts`) — navigates to the institution's login page, fills credentials, handles MFA, and waits for the dashboard.
 2. **Account discovery** (`src/tasks/accounts.ts`) — scans the dashboard to discover all accounts, types, and balances.
+3. **Transaction fetch** (`src/tasks/transactions.ts`) — navigates to each account's transaction history and extracts recent transactions for the configured lookback window (default: 30 days).
 
 After each step, the agent reflects on what worked and what didn't, and writes a short set of notes that are injected into the next session. This means the agent gets faster and more reliable over time for each institution it's seen before.
 
@@ -82,12 +89,36 @@ You'll be prompted for the institution name, login URL, username or email, and p
 npm run cli -- sync
 ```
 
-Opens a real Chrome window, logs into each saved institution, extracts all accounts and balances, and saves them to a local SQLite database.
+Opens a real Chrome window, logs into each saved institution, extracts all accounts, balances, and the last 30 days of transactions, and saves them to a local SQLite database.
 
 **Sync one institution:**
 
 ```bash
 npm run cli -- sync --institution "TD"
+```
+
+**Sync with a custom transaction lookback window:**
+
+```bash
+npm run cli -- sync --days 90
+```
+
+**List stored accounts and latest balances:**
+
+```bash
+npm run cli -- accounts list
+```
+
+**List recent transactions:**
+
+```bash
+npm run cli -- transactions list
+```
+
+Filter by institution, account, or date range:
+
+```bash
+npm run cli -- transactions list --institution "TD" --account "Chequing" --days 7
 ```
 
 ## MFA

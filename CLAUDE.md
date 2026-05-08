@@ -10,6 +10,7 @@ Logs into financial institution websites using a Claude-powered Playwright agent
 - `src/commands/institution.ts` — `institution add` command
 - `src/commands/sync.ts` — `sync` command
 - `src/commands/accounts.ts` — `accounts list` command
+- `src/commands/transactions.ts` — `transactions list` command
 - `src/commands/config.ts` — `config gmail` command
 - `src/commands/utils.ts` — shared CLI helpers: `prompt`, `promptPassword`, `readInstitutions`, `writeInstitutions`
 - `src/keychain.ts` — macOS Keychain helpers
@@ -20,18 +21,23 @@ Logs into financial institution websites using a Claude-powered Playwright agent
 - `src/agent/browser.ts` — shared Playwright tool definitions and executors
 - `src/tasks/login.ts` — Claude-powered login agent (institution-agnostic)
 - `src/tasks/accounts.ts` — Claude-powered account discovery agent
+- `src/tasks/transactions.ts` — Claude-powered transaction fetch agent (per-account, configurable lookback)
 - `src/db/schema.ts` — Drizzle table definitions
 - `src/db/index.ts` — DB connection and auto-migration
-- `src/db/storage.ts` — `saveSync()` writes sync results; `listAccounts()` reads accounts with latest balances
+- `src/db/storage.ts` — `saveSync()` / `saveTransactions()` write sync results; `listAccounts()` / `listTransactions()` read them back
 
 ## Running
 
 ```bash
-npm run cli -- institution add          # Add an institution (saves credentials to Keychain)
-npm run cli -- sync                     # Sync all institutions
-npm run cli -- sync --institution TD    # Sync a single institution by name
-npm run cli -- accounts list            # List all stored accounts and latest balances
-npm run cli -- config gmail             # Configure Gmail for automatic MFA
+npm run cli -- institution add                       # Add an institution (saves credentials to Keychain)
+npm run cli -- sync                                  # Sync all institutions (accounts + last 30 days of transactions)
+npm run cli -- sync --institution TD                 # Sync a single institution by name
+npm run cli -- sync --days 90                        # Sync with a 90-day transaction lookback
+npm run cli -- accounts list                         # List all stored accounts and latest balances
+npm run cli -- transactions list                     # List transactions (last 30 days)
+npm run cli -- transactions list --institution TD    # Filter by institution
+npm run cli -- transactions list --days 7            # Limit to last 7 days
+npm run cli -- config gmail                          # Configure Gmail for automatic MFA
 ```
 
 ## Architecture of login.ts
@@ -94,7 +100,7 @@ OpenVault keeps lightweight per-institution memory so the agent can carry forwar
 - Accounts are visible directly on the dashboard after login
 ```
 
-**Tasks using memory today:** `login` and `accounts`.
+**Tasks using memory today:** `login`, `accounts`, and `transactions`.
 
 **How notes are generated:** After a task completes successfully, the task passes its recorded tool events to `generateSessionNotes()` in `src/memory.ts`. That function asks Claude to summarize what worked, what failed, and any unusual page structure worth remembering next time.
 
@@ -117,7 +123,10 @@ The 10 most recent sessions per host are kept; older ones are pruned automatical
 
 ## Adding a new task
 
-Add a new file under `src/tasks/` (e.g. `transactions.ts`). Import `runAgent` from `../agent` and browser tools from `../agent/browser`. Define task-specific tools, a system prompt, and export a single async function.
+Add a new file under `src/tasks/`. Import `runAgent` from `../agent` and browser tools from
+`../agent/browser`. Define task-specific tools, a system prompt, and export a single async
+function. Use `transactions.ts` as a reference — it shows the full pattern including memory
+integration, per-tool event tracking, and passing `maxTurns` to `runAgent`.
 
 ## Conventions
 
