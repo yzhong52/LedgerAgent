@@ -126,6 +126,20 @@ export function makeAccountsCommand(): Command {
 
           console.log();
           printAccountSyncDiff(inst.name, diff, { demo: opts.demo });
+
+          const allAccounts = listAccounts(db)
+            .filter(a => a.institutionName === inst.name)
+            .map(row => ({
+              institution: row.institutionName,
+              account:     row.accountName,
+              accountId:   row.accountId !== row.accountName ? row.accountId : undefined,
+              type:        row.accountType ?? '—',
+              currency:    row.accountCurrency ?? undefined,
+              balance:     row.amountCents != null ? formatCents(row.amountCents) : '—',
+            }));
+          if (allAccounts.length > 0) {
+            printAccountsTable(allAccounts, { demo: opts.demo, showInstitution: false });
+          }
         }
       } catch (err) {
         console.error(`\n❌ ${err instanceof Error ? err.message : String(err)}`);
