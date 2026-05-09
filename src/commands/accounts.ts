@@ -64,6 +64,25 @@ export function printAccountSyncDiff(
   }
 }
 
+export function printAccountSyncResult(
+  institutionName: string,
+  diff: AccountSyncDiff,
+  allAccounts: AccountRow[],
+  opts: { demo: boolean },
+): void {
+  printAccountSyncDiff(institutionName, diff, opts);
+  if (allAccounts.length > 0) {
+    printAccountsTable(allAccounts.map(row => ({
+      institution: row.institutionName,
+      account:     row.accountName,
+      accountId:   row.accountId !== row.accountName ? row.accountId : undefined,
+      type:        row.accountType ?? '—',
+      currency:    row.accountCurrency ?? undefined,
+      balance:     row.amountCents != null ? formatCents(row.amountCents) : '—',
+    })), { demo: opts.demo, showInstitution: false });
+  }
+}
+
 export function makeAccountsCommand(): Command {
   const cmd = new Command('accounts').description('Sync and view account data');
 
@@ -125,21 +144,11 @@ export function makeAccountsCommand(): Command {
           const diff: AccountSyncDiff = saveSync(db, inst.name, inst.url, accounts);
 
           console.log();
-          printAccountSyncDiff(inst.name, diff, { demo: opts.demo });
-
-          const allAccounts = listAccounts(db)
-            .filter(a => a.institutionName === inst.name)
-            .map(row => ({
-              institution: row.institutionName,
-              account:     row.accountName,
-              accountId:   row.accountId !== row.accountName ? row.accountId : undefined,
-              type:        row.accountType ?? '—',
-              currency:    row.accountCurrency ?? undefined,
-              balance:     row.amountCents != null ? formatCents(row.amountCents) : '—',
-            }));
-          if (allAccounts.length > 0) {
-            printAccountsTable(allAccounts, { demo: opts.demo, showInstitution: false });
-          }
+          printAccountSyncResult(
+            inst.name, diff,
+            listAccounts(db).filter(a => a.institutionName === inst.name),
+            { demo: opts.demo },
+          );
         }
       } catch (err) {
         console.error(`\n❌ ${err instanceof Error ? err.message : String(err)}`);

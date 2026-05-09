@@ -6,8 +6,9 @@ import * as path from 'path';
 import * as schema from './schema';
 import { getNetWorthHistory, saveSync, saveTransactions } from './storage';
 import { type Db } from './index';
-import { printAccountSyncDiff } from '../commands/accounts';
-import { printNewTransactionsTable } from '../commands/transactions';
+import { printAccountSyncResult } from '../commands/accounts';
+import { printTransactionSyncResult } from '../commands/transactions';
+import { listAccounts } from './storage';
 
 function makeDb(): { sqlite: Database.Database; db: Db } {
   const sqlite = new Database(':memory:');
@@ -120,29 +121,59 @@ describe('example console output', () => {
   });
   afterEach(() => { spy.mockRestore(); sqlite.close(); });
 
-  it('accounts sync diff', () => {
+  it('accounts sync result', () => {
     saveSync(db, 'TD', 'https://td.com', [CHQ, SAV]);
     const diff = saveSync(db, 'TD', 'https://td.com', [{ ...CHQ, balance: 1500 }, RRSP]);
-    printAccountSyncDiff('TD', diff, { demo: false });
-    const lines = spy.mock.calls.map((c: unknown[]) => c.join(' '));
-    expect(lines).toContain('  + 1 new account(s) discovered:');
-    expect(lines.find((l: string) => l.includes('~ 1 account'))).toBeTruthy();
-    expect(lines.find((l: string) => l.includes('balance $1000.00 → $1500.00'))).toBeTruthy();
-    expect(lines.find((l: string) => l.includes('- 1 account'))).toBeTruthy();
+    printAccountSyncResult('TD', diff, listAccounts(db).filter(a => a.institutionName === 'TD'), { demo: false });
+    expect(spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n')).toMatchInlineSnapshot(`
+      "  + 1 new account(s) discovered:
+
+        Account  ID    Type         Balance
+        -------  ----  ----  --------------
+        RRSP     rrsp  RRSP  CAD $50,000.00
+
+        ~ 1 account(s) updated:
+            Chequing: balance $1000.00 → $1500.00
+
+        - 1 account(s) no longer found
+          (kept for historical records; delete manually if desired)
+            Savings
+
+
+        Account   ID    Type             Balance
+        --------  ----  --------  --------------
+        Chequing  chq   Chequing   CAD $1,500.00
+        RRSP      rrsp  RRSP      CAD $50,000.00
+        Savings   sav   Savings    CAD $2,000.00
+      "
+    `);
   });
 
-  it('transactions sync new rows', () => {
+  it('transactions sync result — new rows', () => {
     saveSync(db, 'TD', 'https://td.com', [CHQ]);
     const newTxs = saveTransactions(db, 'TD', 'chq', [
       { datetime: '2026-05-06', description: 'Progression Bouldering', amount: -23.10 },
       { datetime: '2026-05-05', description: 'Anthropic',              amount: -313.60 },
       { datetime: '2026-04-25', description: 'Payroll deposit',        amount: 3200.00 },
     ]);
-    printNewTransactionsTable(newTxs);
-    const lines = spy.mock.calls.map((c: unknown[]) => c.join(' '));
-    expect(lines.find((l: string) => l.includes('Progression Bouldering'))).toBeTruthy();
-    expect(lines.find((l: string) => l.includes('Anthropic'))).toBeTruthy();
-    expect(lines.find((l: string) => l.includes('Payroll deposit'))).toBeTruthy();
+    printTransactionSyncResult('Chequing', newTxs);
+    expect(spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n')).toMatchInlineSnapshot(`
+      "  ✓ 3 new transaction(s) for Chequing:
+          Date        Description                Amount
+          ----------  ----------------------  ---------
+          2026-05-06  Progression Bouldering    -$23.10
+          2026-05-05  Anthropic                -$313.60
+          2026-04-25  Payroll deposit         $3,200.00
+      "
+    `);
+  });
+
+  it('transactions sync result — no new rows', () => {
+    saveSync(db, 'TD', 'https://td.com', [CHQ]);
+    saveTransactions(db, 'TD', 'chq', [{ datetime: '2026-05-06', description: 'Coffee', amount: -5 }]);
+    const newTxs = saveTransactions(db, 'TD', 'chq', [{ datetime: '2026-05-06', description: 'Coffee', amount: -5 }]);
+    printTransactionSyncResult('Chequing', newTxs);
+    expect(spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n')).toMatchInlineSnapshot(`"  (no new transactions for Chequing)"`);
   });
 });
 

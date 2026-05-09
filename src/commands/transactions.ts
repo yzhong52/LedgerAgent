@@ -8,6 +8,15 @@ import { saveTransactions, listAccounts, listTransactions, type TransactionRow }
 import type { Transaction } from '../tasks/transactions';
 import { prompt, readInstitutions, formatCents, launchBrowser } from './utils';
 
+export function printTransactionSyncResult(accountName: string, newTxs: Transaction[]): void {
+  if (newTxs.length === 0) {
+    console.log(`  (no new transactions for ${accountName})`);
+  } else {
+    console.log(`  ✓ ${newTxs.length} new transaction(s) for ${accountName}:`);
+    printNewTransactionsTable(newTxs);
+  }
+}
+
 export function printNewTransactionsTable(txs: Transaction[]): void {
   const entries = txs.map(t => ({
     date:        t.datetime.includes('T') ? t.datetime.slice(0, 16).replace('T', ' ') : t.datetime,
@@ -180,12 +189,7 @@ export function makeTransactionsCommand(): Command {
                 page, inst.name, account, lookbackDays, sessionDir,
               );
               const newTxs = saveTransactions(db, inst.name, account.accountId, txs);
-              if (newTxs.length === 0) {
-                console.log(`  (no new transactions for ${account.name})`);
-              } else {
-                console.log(`  ✓ ${newTxs.length} new transaction(s) for ${account.name}:`);
-                printNewTransactionsTable(newTxs);
-              }
+              printTransactionSyncResult(account.name, newTxs);
             } catch (err) {
               console.error(
                 `  ❌ Transactions failed for ${account.name}: ` +
