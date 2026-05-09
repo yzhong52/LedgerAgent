@@ -78,7 +78,7 @@ export function App() {
           </div>
         )}
         {!loading && !error && page === 'dashboard' && (
-          <Dashboard accounts={accounts} history={netWorth} transactions={transactions} onViewAll={() => navigate('transactions')}/>
+          <Dashboard accounts={accounts} history={netWorth} transactions={transactions} onViewAll={() => navigate('transactions')} demo={demo}/>
         )}
         {!loading && !error && page === 'accounts' && (
           <AccountsPage accounts={accounts}/>

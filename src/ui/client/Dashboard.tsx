@@ -36,12 +36,12 @@ function StatCard({ label, value, sub, accent }: {
   );
 }
 
-function toMonthly(history: NetWorthPoint[]) {
+function toMonthly(history: NetWorthPoint[], months: number) {
   const byMonth = new Map<string, number>();
   for (const p of history) byMonth.set(p.date.slice(0, 7), p.amountCents);
   return Array.from(byMonth.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-6)
+    .slice(-months)
     .map(([month, cents]) => ({
       month: new Date(month + '-01T12:00:00').toLocaleDateString('en-CA', { month: 'short' }),
       valueCents: cents,
@@ -66,6 +66,7 @@ interface Props {
   history: NetWorthPoint[];
   transactions: TransactionRow[];
   onViewAll: () => void;
+  demo?: string;
 }
 
 function greeting() {
@@ -81,13 +82,13 @@ function formatDate(d: Date) {
   return d.toLocaleDateString('en-CA', { month: 'long' }) + ' ' + day + suffix + ', ' + d.getFullYear();
 }
 
-export function Dashboard({ accounts, history, transactions, onViewAll }: Props) {
+export function Dashboard({ accounts, history, transactions, onViewAll, demo }: Props) {
   const assetAccounts = accounts.filter(a => (a.amountCents ?? 0) > 0);
   const debtAccounts  = accounts.filter(a => (a.amountCents ?? 0) < 0);
   const netWorthCents = accounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
   const assetsCents   = assetAccounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
   const debtCents     = debtAccounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
-  const chartData     = toMonthly(history);
+  const chartData     = toMonthly(history, demo ? 12 : 6);
   const institutions  = Array.from(new Set(accounts.map(a => a.institutionName)));
 
   return (

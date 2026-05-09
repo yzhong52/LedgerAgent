@@ -76,7 +76,7 @@ app.get('/api/net-worth', (c) => {
     let history = getNetWorthHistory(db);
 
     const demo = c.req.query('demo') as DemoMode | undefined;
-    if ((demo === 'poor' || demo === 'rich') && history.length > 0) {
+    if (demo === 'poor' || demo === 'rich') {
       // Anchor the chart end to the sum of fake balances so chart and cards always agree.
       const accounts = listAccounts(db);
       let runningTotal = accounts.reduce((sum, a) =>
@@ -84,14 +84,19 @@ app.get('/api/net-worth', (c) => {
           ? getDemoBalance(`${a.institutionName}/${a.accountName}`, a.accountType, demo)
           : 0)
       , 0);
+      if (runningTotal === 0) runningTotal = demo === 'rich' ? 15_000_000_00 : 5_000_000;
 
-      // Walk backwards through history, applying a random simulated market variance
-      for (let i = history.length - 1; i >= 0; i--) {
-        history[i].amountCents = runningTotal;
-        // Going backwards: balance drops by -0.5% to +1.5% per day to simulate an upward trend
-        const variance = (Math.random() * 0.02) - 0.005; 
+      // Generate 365 days of synthetic history ending today, simulating an upward trend
+      const today = new Date();
+      const points = [];
+      for (let i = 0; i < 365; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        points.push({ date: d.toISOString().slice(0, 10), amountCents: runningTotal });
+        const variance = (Math.random() * 0.02) - 0.005;
         runningTotal = Math.floor(runningTotal * (1 - variance));
       }
+      history = points.reverse();
     }
 
     return c.json(history);
