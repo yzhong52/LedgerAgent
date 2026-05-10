@@ -4,8 +4,12 @@ import { eq, desc, and, gte } from 'drizzle-orm';
 import type { Account } from '../tasks/accounts';
 import { ACCOUNT_TYPES } from '../tasks/accounts';
 import type { Transaction } from '../tasks/transactions';
+import type { Holding } from '../tasks/holdings';
 import { type Db } from '.';
-import { institutions, accounts as accountsTable, syncs, balances, transactions as transactionsTable } from './schema';
+import {
+  institutions, accounts as accountsTable, syncs, balances,
+  transactions as transactionsTable, holdings as holdingsTable,
+} from './schema';
 
 function toDateString(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -312,6 +316,65 @@ export function listTransactions(
     return base.where(and(...conditions)).orderBy(desc(transactionsTable.datetime)).all();
   }
   return base.orderBy(desc(transactionsTable.datetime)).all();
+}
+
+export function saveHoldings(
+  db: Db,
+  institutionName: string,
+  rawAccountId: string,
+  holdingList: Holding[],
+): void {
+  const institutionId = slugify(institutionName);
+
+  const account = db
+    .select({ id: accountsTable.id })
+    .from(accountsTable)
+    .where(and(
+      eq(accountsTable.institutionId, institutionId),
+      eq(accountsTable.accountId, rawAccountId),
+    ))
+    .get();
+
+  if (!account) return;
+
+  const sync = db
+    .select({ id: syncs.id })
+    .from(syncs)
+    .where(eq(syncs.institutionId, institutionId))
+    .orderBy(desc(syncs.id))
+    .limit(1)
+    .get();
+
+  if (!sync) return;
+
+  db.transaction((tx) => {
+    for (const h of holdingList) {
+      tx.insert(holdingsTable)
+        .values({
+          accountId:    account.id,
+          syncId:       sync.id,
+          symbol:       h.symbol,
+          name:         h.name,
+          quantity:     h.quantity,
+          pricePerUnit: Math.round(h.pricePerUnit * 100),
+          marketValue:  Math.round(h.marketValue * 100),
+          costBasis:    h.costBasis != null ? Math.round(h.costBasis * 100) : null,
+          currency:     h.currency,
+        })
+        .onConflictDoUpdate({
+          target: [holdingsTable.accountId, holdingsTable.syncId, holdingsTable.symbol],
+          set: {
+            name:         h.name,
+            quantity:     h.quantity,
+            pricePerUnit: Math.round(h.pricePerUnit * 100),
+            marketValue:  Math.round(h.marketValue * 100),
+            costBasis:    h.costBasis != null ? Math.round(h.costBasis * 100) : null,
+            currency:     h.currency,
+          },
+        })
+        .run();
+    }
+  });
 }
 
 export function mergeAccounts(db: Db, sourceId: number, targetId: number): void {

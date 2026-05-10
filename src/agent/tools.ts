@@ -42,6 +42,10 @@ export const TRANSACTION_TOOL = {
   REPORT_TRANSACTIONS: 'report_transactions',
 } as const;
 
+export const HOLDING_TOOL = {
+  REPORT_HOLDINGS: 'report_holdings',
+} as const;
+
 /** Tools that modify page or form state. The agent loop takes an implicit snapshot
  *  after each one so the cache can fingerprint the result without waiting for Claude
  *  to explicitly call the snapshot tool. */

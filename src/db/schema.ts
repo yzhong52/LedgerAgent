@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const institutions = sqliteTable('institutions', {
   id:   text('id').primaryKey(),
@@ -43,3 +43,16 @@ export const transactions = sqliteTable('transactions', {
   amountCents:   integer('amount_cents').notNull(),  // signed; negative = debit
   currency:      text('currency'),
 }, t => [uniqueIndex('transactions_account_txid').on(t.accountId, t.transactionId)]);
+
+export const holdings = sqliteTable('holdings', {
+  id:           integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  accountId:    integer('account_id', { mode: 'number' }).notNull().references(() => accounts.id),
+  syncId:       integer('sync_id', { mode: 'number' }).notNull().references(() => syncs.id),
+  symbol:       text('symbol').notNull(),
+  name:         text('name'),
+  quantity:     real('quantity').notNull(),
+  pricePerUnit: integer('price_per_unit').notNull(),  // cents
+  marketValue:  integer('market_value').notNull(),    // cents
+  costBasis:    integer('cost_basis'),                // cents; nullable
+  currency:     text('currency'),
+}, t => [uniqueIndex('holdings_account_sync_symbol').on(t.accountId, t.syncId, t.symbol)]);
