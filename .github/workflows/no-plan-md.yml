@@ -1,0 +1,19 @@
+name: Block plan.md
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if plan.md exists
+        run: |
+          if find . -name "plan.md" | grep -q .; then
+            echo "Error: plan.md must not be merged to main."
+            exit 1
+          fi
