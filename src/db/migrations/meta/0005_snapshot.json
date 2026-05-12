@@ -171,9 +171,9 @@
           "notNull": true,
           "autoincrement": false
         },
-        "sync_id": {
-          "name": "sync_id",
-          "type": "integer",
+        "date": {
+          "name": "date",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -229,11 +229,11 @@
         }
       },
       "indexes": {
-        "holdings_account_sync_symbol": {
-          "name": "holdings_account_sync_symbol",
+        "holdings_account_date_symbol": {
+          "name": "holdings_account_date_symbol",
           "columns": [
             "account_id",
-            "sync_id",
+            "date",
             "symbol"
           ],
           "isUnique": true
@@ -246,19 +246,6 @@
           "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "holdings_sync_id_syncs_id_fk": {
-          "name": "holdings_sync_id_syncs_id_fk",
-          "tableFrom": "holdings",
-          "tableTo": "syncs",
-          "columnsFrom": [
-            "sync_id"
           ],
           "columnsTo": [
             "id"

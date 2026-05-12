@@ -47,7 +47,11 @@ export const transactions = sqliteTable('transactions', {
 export const holdings = sqliteTable('holdings', {
   id:           integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   accountId:    integer('account_id', { mode: 'number' }).notNull().references(() => accounts.id),
-  syncId:       integer('sync_id', { mode: 'number' }).notNull().references(() => syncs.id),
+  // YYYY-MM-DD; one snapshot per account per day — last sync on a given day overwrites the
+  // previous one. Consistent with how balances works. Trade-off: two syncs on the same day
+  // don't accumulate; the earlier snapshot is lost. Acceptable because holdings are
+  // point-in-time data and intra-day changes don't matter for net worth tracking.
+  date:         text('date').notNull(),
   symbol:       text('symbol').notNull(),
   name:         text('name'),
   quantity:     real('quantity').notNull(),
@@ -55,4 +59,4 @@ export const holdings = sqliteTable('holdings', {
   marketValue:  integer('market_value').notNull(),    // cents
   costBasis:    integer('cost_basis'),                // cents; nullable
   currency:     text('currency'),
-}, t => [uniqueIndex('holdings_account_sync_symbol').on(t.accountId, t.syncId, t.symbol)]);
+}, t => [uniqueIndex('holdings_account_date_symbol').on(t.accountId, t.date, t.symbol)]);

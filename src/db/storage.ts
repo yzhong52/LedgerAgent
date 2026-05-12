@@ -334,7 +334,7 @@ export function listHoldings(db: Db): HoldingRow[] {
   const rows = db
     .select({
       internalAccountId: accountsTable.id,
-      syncId:            holdingsTable.syncId,
+      date:              holdingsTable.date,
       institutionName:   institutions.name,
       accountName:       accountsTable.name,
       symbol:            holdingsTable.symbol,
@@ -350,54 +350,30 @@ export function listHoldings(db: Db): HoldingRow[] {
     .innerJoin(institutions, eq(accountsTable.institutionId, institutions.id))
     .all();
 
-  // For each account, keep only the rows from the latest sync
-  const latestSync = new Map<number, number>();
+  // For each account, keep only the rows from the latest date
+  const latestDate = new Map<number, string>();
   for (const r of rows) {
-    const cur = latestSync.get(r.internalAccountId) ?? -1;
-    if (r.syncId > cur) latestSync.set(r.internalAccountId, r.syncId);
+    const cur = latestDate.get(r.internalAccountId) ?? '';
+    if (r.date > cur) latestDate.set(r.internalAccountId, r.date);
   }
 
   return rows
-    .filter(r => latestSync.get(r.internalAccountId) === r.syncId)
+    .filter(r => latestDate.get(r.internalAccountId) === r.date)
     .sort((a, b) => b.marketValueCents - a.marketValueCents)
-    .map(({ internalAccountId: _a, syncId: _s, ...rest }) => rest);
+    .map(({ internalAccountId: _a, date: _d, ...rest }) => rest);
 }
 
-export function saveHoldings(
-  db: Db,
-  institutionName: string,
-  rawAccountId: string,
-  holdingList: Holding[],
-): void {
-  const institutionId = slugify(institutionName);
-
-  const account = db
-    .select({ id: accountsTable.id })
-    .from(accountsTable)
-    .where(and(
-      eq(accountsTable.institutionId, institutionId),
-      eq(accountsTable.accountId, rawAccountId),
-    ))
-    .get();
-
-  if (!account) return;
-
-  const sync = db
-    .select({ id: syncs.id })
-    .from(syncs)
-    .where(eq(syncs.institutionId, institutionId))
-    .orderBy(desc(syncs.id))
-    .limit(1)
-    .get();
-
-  if (!sync) return;
+// accountId is the internal surrogate PK (accounts.id), not the institution-reported string ID
+// which can change across syncs.
+export function saveHoldings(db: Db, accountId: number, holdingList: Holding[]): void {
+  const today = toDateString(new Date());
 
   db.transaction((tx) => {
     for (const h of holdingList) {
       tx.insert(holdingsTable)
         .values({
-          accountId:    account.id,
-          syncId:       sync.id,
+          accountId,
+          date:         today,
           symbol:       h.symbol,
           name:         h.name,
           quantity:     h.quantity,
@@ -407,7 +383,7 @@ export function saveHoldings(
           currency:     h.currency,
         })
         .onConflictDoUpdate({
-          target: [holdingsTable.accountId, holdingsTable.syncId, holdingsTable.symbol],
+          target: [holdingsTable.accountId, holdingsTable.date, holdingsTable.symbol],
           set: {
             name:         h.name,
             quantity:     h.quantity,
