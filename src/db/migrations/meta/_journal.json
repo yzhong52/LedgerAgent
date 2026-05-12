@@ -36,6 +36,20 @@
       "when": 1778277506561,
       "tag": "0004_steady_dracula",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1778448947873,
+      "tag": "0005_holdings",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1778561383945,
+      "tag": "0006_add_account_category",
+      "breakpoints": true
     }
   ]
 }

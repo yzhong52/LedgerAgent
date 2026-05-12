@@ -1,10 +1,11 @@
 import { Command } from 'commander';
 import { login } from '../tasks/login';
 import { exploreAccounts, type AccountType } from '../tasks/accounts';
+import { exploreHoldings } from '../tasks/holdings';
 import { createSession } from '../agent';
 import { keychainLoad } from '../keychain';
 import { openDb } from '../db';
-import { saveSync, listAccounts, mergeAccounts, type AccountRow, type AccountSyncDiff } from '../db/storage';
+import { saveSync, saveHoldings, listAccounts, mergeAccounts, type AccountRow, type AccountSyncDiff } from '../db/storage';
 import { prompt, readInstitutions, printAccountsTable, formatCents, selectFromList, launchBrowser } from './utils';
 
 function accountLabels(rows: AccountRow[], { showInstitution }: { showInstitution: boolean }): string[] {
@@ -144,10 +145,24 @@ export function makeAccountsCommand(): Command {
           const accounts = await exploreAccounts(page, inst.name, sessionDir, existingAccountsMsg);
           const diff: AccountSyncDiff = saveSync(db, inst.name, inst.url, accounts);
 
+          const allSyncedAccounts = listAccounts(db).filter(a => a.institutionName === inst.name);
+          const investmentAccounts = accounts.filter(
+            a => a.category === 'Brokerage' || a.category === 'Managed Investment',
+          );
+          for (const account of investmentAccounts) {
+            const row = allSyncedAccounts.find(
+              r => r.accountId === (account.accountId ?? account.name),
+            );
+            if (!row) continue;
+            const holdings = await exploreHoldings(page, inst.name, account, sessionDir);
+            saveHoldings(db, row.id, holdings);
+            console.log(`  Holdings for ${account.name}: ${holdings.length} position(s)`);
+          }
+
           console.log();
           printAccountSyncResult(
             inst.name, diff,
-            listAccounts(db).filter(a => a.institutionName === inst.name),
+            allSyncedAccounts,
             { demo: opts.demo },
           );
         }

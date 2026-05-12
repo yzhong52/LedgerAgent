@@ -2,6 +2,7 @@ export interface AccountRow {
   institutionName: string;
   accountName: string;
   accountType: string | null;
+  accountCategory: string | null;
   accountCurrency: string | null;
   accountId: string;
   latestDate: string | null;
@@ -20,6 +21,18 @@ export interface TransactionRow {
   datetime: string;
   description: string;
   amountCents: number;
+  currency: string | null;
+}
+
+export interface HoldingRow {
+  institutionName: string;
+  accountName: string;
+  symbol: string;
+  name: string | null;
+  quantity: number;
+  pricePerUnitCents: number;
+  marketValueCents: number;
+  costBasisCents: number | null;
   currency: string | null;
 }
 
@@ -48,5 +61,11 @@ export async function fetchNetWorth(demo: DemoMode): Promise<NetWorthPoint[]> {
 export async function fetchTransactions(demo: DemoMode): Promise<TransactionRow[]> {
   const res = await fetch(`/api/transactions${demoParam(demo)}`);
   if (!res.ok) throw new Error('Failed to fetch transactions');
+  return res.json();
+}
+
+export async function fetchHoldings(demo: DemoMode): Promise<HoldingRow[]> {
+  const res = await fetch(`/api/holdings${demoParam(demo)}`);
+  if (!res.ok) throw new Error('Failed to fetch holdings');
   return res.json();
 }

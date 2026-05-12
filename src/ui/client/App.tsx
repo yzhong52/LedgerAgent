@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  fetchAccounts, fetchNetWorth, fetchTransactions, demoModeFromUrl,
-  type AccountRow, type NetWorthPoint, type TransactionRow, type DemoMode,
+  fetchAccounts, fetchNetWorth, fetchTransactions, fetchHoldings, demoModeFromUrl,
+  type AccountRow, type NetWorthPoint, type TransactionRow, type HoldingRow, type DemoMode,
 } from './api';
 import { Sidebar, type Page } from './Sidebar';
 import { Dashboard } from './Dashboard';
@@ -35,6 +35,7 @@ export function App() {
   const [accounts,     setAccounts]     = useState<AccountRow[]>([]);
   const [netWorth,     setNetWorth]     = useState<NetWorthPoint[]>([]);
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+  const [holdings,     setHoldings]     = useState<HoldingRow[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState<string | null>(null);
   const [page,         setPage]         = useState<Page>(pageFromPath);
@@ -43,8 +44,10 @@ export function App() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    Promise.all([fetchAccounts(demo), fetchNetWorth(demo), fetchTransactions(demo)])
-      .then(([accs, hist, txs]) => { setAccounts(accs); setNetWorth(hist); setTransactions(txs); })
+    Promise.all([fetchAccounts(demo), fetchNetWorth(demo), fetchTransactions(demo), fetchHoldings(demo)])
+      .then(([accs, hist, txs, hlds]) => {
+        setAccounts(accs); setNetWorth(hist); setTransactions(txs); setHoldings(hlds);
+      })
       .catch(err => { console.error(err); setError(err.message); })
       .finally(() => setLoading(false));
   }, [demo]);
@@ -77,10 +80,13 @@ export function App() {
           </div>
         )}
         {!loading && !error && page === 'dashboard' && (
-          <Dashboard accounts={accounts} history={netWorth} transactions={transactions} onViewAll={() => navigate('transactions')}/>
+          <Dashboard
+            accounts={accounts} history={netWorth} transactions={transactions}
+            holdings={holdings} onViewAll={() => navigate('transactions')}
+          />
         )}
         {!loading && !error && page === 'accounts' && (
-          <AccountsPage accounts={accounts}/>
+          <AccountsPage accounts={accounts} holdings={holdings}/>
         )}
         {!loading && !error && page === 'transactions' && (
           <TransactionsPage transactions={transactions}/>

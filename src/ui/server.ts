@@ -3,12 +3,23 @@ import { Hono, type Context } from 'hono';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { openDb } from '../db';
-import { listAccounts, getNetWorthHistory, listTransactions, type TransactionRow } from '../db/storage';
+import {
+  listAccounts, getNetWorthHistory, listTransactions, listHoldings,
+  type TransactionRow,
+} from '../db/storage';
 
 const app = new Hono();
 
-// Stable per-session balances so the numbers don't change on every request.
+// Stable per-session demo values so numbers don't change on every request.
 const demoBalances = new Map<string, number>();
+const demoHoldingValues = new Map<string, number>();
+
+function getDemoHoldingValue(key: string): number {
+  if (demoHoldingValues.has(key)) return demoHoldingValues.get(key)!;
+  const value = Math.floor((Math.random() * (30_000 - 500) + 500) * 100);
+  demoHoldingValues.set(key, value);
+  return value;
+}
 
 function isDemoDebt(accountId: string, type: string | null): boolean {
   if (type === 'credit' || type === 'loan') return true;
@@ -157,6 +168,23 @@ app.get('/api/transactions', (c) => {
   const { db, close } = openDb();
   try {
     return c.json(listTransactions(db, { days }));
+  } finally {
+    close();
+  }
+});
+
+app.get('/api/holdings', (c) => {
+  const demo = !!c.req.query('demo');
+  const { db, close } = openDb();
+  try {
+    let rows = listHoldings(db);
+    if (demo) {
+      rows = rows.map(h => {
+        const mv = getDemoHoldingValue(`${h.institutionName}/${h.accountName}/${h.symbol}`);
+        return { ...h, marketValueCents: mv, pricePerUnitCents: Math.round(mv / Math.max(h.quantity, 1)) };
+      });
+    }
+    return c.json(rows);
   } finally {
     close();
   }

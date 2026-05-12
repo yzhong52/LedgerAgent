@@ -2,10 +2,14 @@
 import { createHash } from 'crypto';
 import { eq, desc, and, gte } from 'drizzle-orm';
 import type { Account } from '../tasks/accounts';
-import { ACCOUNT_TYPES } from '../tasks/accounts';
+import { ACCOUNT_TYPES, ACCOUNT_CATEGORIES } from '../tasks/accounts';
 import type { Transaction } from '../tasks/transactions';
+import type { Holding } from '../tasks/holdings';
 import { type Db } from '.';
-import { institutions, accounts as accountsTable, syncs, balances, transactions as transactionsTable } from './schema';
+import {
+  institutions, accounts as accountsTable, syncs, balances,
+  transactions as transactionsTable, holdings as holdingsTable,
+} from './schema';
 
 function toDateString(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -20,12 +24,18 @@ function normalizeType(raw: string | undefined): string | undefined {
   return ACCOUNT_TYPES.find(t => t.toLowerCase() === raw.toLowerCase()) ?? raw.toLowerCase();
 }
 
+function normalizeCategory(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  return ACCOUNT_CATEGORIES.find(c => c.toLowerCase() === raw.toLowerCase()) ?? undefined;
+}
+
 
 export interface AccountRow {
   id: number;
   institutionName: string;
   accountName: string;
   accountType: string | null;
+  accountCategory: string | null;
   accountCurrency: string | null;
   accountId: string;
   latestDate: string | null;
@@ -39,6 +49,7 @@ export function listAccounts(db: Db): AccountRow[] {
       institutionName: institutions.name,
       accountName:     accountsTable.name,
       accountType:     accountsTable.type,
+      accountCategory: accountsTable.category,
       accountCurrency: accountsTable.currency,
       accountId:       accountsTable.accountId,
       latestDate:      accountsTable.latestDate,
@@ -98,6 +109,10 @@ export function saveSync(
       if ((prev.accountType ?? null) !== newType) {
         changes.push(`type ${prev.accountType ?? '—'} → ${newType ?? '—'}`);
       }
+      const newCategory = normalizeCategory(account.category) ?? null;
+      if ((prev.accountCategory ?? null) !== newCategory) {
+        changes.push(`category ${prev.accountCategory ?? '—'} → ${newCategory ?? '—'}`);
+      }
       if ((prev.accountCurrency ?? null) !== (account.currency ?? null)) {
         changes.push(`currency ${prev.accountCurrency ?? '—'} → ${account.currency ?? '—'}`);
       }
@@ -131,14 +146,14 @@ export function saveSync(
       const { id: intId } = tx.insert(accountsTable)
         .values({
           institutionId, accountId: rawAccountId, name: account.name,
-          type: normalizeType(account.type), currency: account.currency,
-          latestDate: today, latestAmountCents: amountCents,
+          type: normalizeType(account.type), category: normalizeCategory(account.category),
+          currency: account.currency, latestDate: today, latestAmountCents: amountCents,
         })
         .onConflictDoUpdate({
           target: [accountsTable.institutionId, accountsTable.accountId],
           set: {
-            type: normalizeType(account.type), currency: account.currency,
-            latestDate: today, latestAmountCents: amountCents,
+            type: normalizeType(account.type), category: normalizeCategory(account.category),
+            currency: account.currency, latestDate: today, latestAmountCents: amountCents,
           },
         })
         .returning({ id: accountsTable.id })
@@ -312,6 +327,86 @@ export function listTransactions(
     return base.where(and(...conditions)).orderBy(desc(transactionsTable.datetime)).all();
   }
   return base.orderBy(desc(transactionsTable.datetime)).all();
+}
+
+export interface HoldingRow {
+  institutionName: string;
+  accountName: string;
+  symbol: string;
+  name: string | null;
+  quantity: number;
+  pricePerUnitCents: number;
+  marketValueCents: number;
+  costBasisCents: number | null;
+  currency: string | null;
+}
+
+export function listHoldings(db: Db): HoldingRow[] {
+  const rows = db
+    .select({
+      internalAccountId: accountsTable.id,
+      date:              holdingsTable.date,
+      institutionName:   institutions.name,
+      accountName:       accountsTable.name,
+      symbol:            holdingsTable.symbol,
+      name:              holdingsTable.name,
+      quantity:          holdingsTable.quantity,
+      pricePerUnitCents: holdingsTable.pricePerUnit,
+      marketValueCents:  holdingsTable.marketValue,
+      costBasisCents:    holdingsTable.costBasis,
+      currency:          holdingsTable.currency,
+    })
+    .from(holdingsTable)
+    .innerJoin(accountsTable, eq(holdingsTable.accountId, accountsTable.id))
+    .innerJoin(institutions, eq(accountsTable.institutionId, institutions.id))
+    .all();
+
+  // For each account, keep only the rows from the latest date
+  const latestDate = new Map<number, string>();
+  for (const r of rows) {
+    const cur = latestDate.get(r.internalAccountId) ?? '';
+    if (r.date > cur) latestDate.set(r.internalAccountId, r.date);
+  }
+
+  return rows
+    .filter(r => latestDate.get(r.internalAccountId) === r.date)
+    .sort((a, b) => b.marketValueCents - a.marketValueCents)
+    .map(({ internalAccountId: _a, date: _d, ...rest }) => rest);
+}
+
+// accountId is the internal surrogate PK (accounts.id), not the institution-reported string ID
+// which can change across syncs.
+export function saveHoldings(db: Db, accountId: number, holdingList: Holding[]): void {
+  const today = toDateString(new Date());
+
+  db.transaction((tx) => {
+    for (const h of holdingList) {
+      tx.insert(holdingsTable)
+        .values({
+          accountId,
+          date:         today,
+          symbol:       h.symbol,
+          name:         h.name,
+          quantity:     h.quantity,
+          pricePerUnit: Math.round(h.pricePerUnit * 100),
+          marketValue:  Math.round(h.marketValue * 100),
+          costBasis:    h.costBasis != null ? Math.round(h.costBasis * 100) : null,
+          currency:     h.currency,
+        })
+        .onConflictDoUpdate({
+          target: [holdingsTable.accountId, holdingsTable.date, holdingsTable.symbol],
+          set: {
+            name:         h.name,
+            quantity:     h.quantity,
+            pricePerUnit: Math.round(h.pricePerUnit * 100),
+            marketValue:  Math.round(h.marketValue * 100),
+            costBasis:    h.costBasis != null ? Math.round(h.costBasis * 100) : null,
+            currency:     h.currency,
+          },
+        })
+        .run();
+    }
+  });
 }
 
 export function mergeAccounts(db: Db, sourceId: number, targetId: number): void {
