@@ -21,7 +21,7 @@ const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   'Brokerage':  { bg: 'oklch(0.92 0.07 240)', text: 'oklch(0.36 0.14 240)' },
   'Investment': { bg: 'oklch(0.92 0.07 240)', text: 'oklch(0.36 0.14 240)' },
 };
-const DEFAULT_TYPE_COLOR = { bg: 'oklch(0.94 0.005 260)', text: 'oklch(0.45 0.01 260)' };
+const DEFAULT_TYPE_COLOR = { bg: 'var(--bg-tag)', text: 'var(--text-secondary)' };
 
 function TypeBadge({ type }: { type: string }) {
   const { bg, text } = TYPE_COLORS[type] ?? DEFAULT_TYPE_COLOR;
@@ -92,7 +92,7 @@ export function AccountsPage({ accounts, holdings }: Props) {
       <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em' }}>Accounts</h1>
-          <p style={{ fontSize: 14, color: 'oklch(0.55 0.01 260)', marginTop: 3 }}>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 3 }}>
             {accounts.length} account{accounts.length !== 1 ? 's' : ''} across{' '}
             {institutions.length} institution{institutions.length !== 1 ? 's' : ''}
           </p>
@@ -103,8 +103,8 @@ export function AccountsPage({ accounts, holdings }: Props) {
           onChange={e => handleGroupBy(e.target.value as GroupBy)}
           style={{
             padding: '5px 10px', borderRadius: 7,
-            border: '1px solid oklch(0.88 0.005 260)',
-            background: '#fff', color: 'oklch(0.3 0.01 260)',
+            border: '1px solid var(--border-input)',
+            background: 'var(--bg-card)', color: 'var(--text-primary)',
             fontSize: 12.5, fontWeight: 500, fontFamily: 'inherit',
             cursor: 'pointer', outline: 'none',
           }}
@@ -116,10 +116,10 @@ export function AccountsPage({ accounts, holdings }: Props) {
 
       {accounts.length === 0 && (
         <div style={{
-          background: '#fff', borderRadius: 12,
-          border: '1px solid oklch(0.91 0.005 260)',
+          background: 'var(--bg-card)', borderRadius: 12,
+          border: '1px solid var(--border-card)',
           padding: '40px 24px', textAlign: 'center',
-          color: 'oklch(0.6 0.01 260)', fontSize: 14,
+          color: 'var(--text-tertiary)', fontSize: 14,
         }}>
           No accounts yet — run <code style={{ fontFamily: "'DM Mono', monospace" }}>sync</code> to get started.
         </div>
@@ -132,8 +132,8 @@ export function AccountsPage({ accounts, holdings }: Props) {
 
           return (
             <div key={key} style={{
-              background: '#fff', borderRadius: 12,
-              border: '1px solid oklch(0.91 0.005 260)', overflow: 'hidden',
+              background: 'var(--bg-card)', borderRadius: 12,
+              border: '1px solid var(--border-card)', overflow: 'hidden',
             }}>
               <button
                 onClick={() => setExpanded(open ? null : key)}
@@ -143,7 +143,7 @@ export function AccountsPage({ accounts, holdings }: Props) {
                   border: 'none', background: 'transparent', cursor: 'pointer',
                   textAlign: 'left', fontFamily: 'inherit',
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'oklch(0.98 0.003 60)'; }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-row-hover)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
               >
                 {groupBy === 'institution' ? (
@@ -151,7 +151,7 @@ export function AccountsPage({ accounts, holdings }: Props) {
                 ) : (
                   <div style={{
                     width: 36, height: 36, borderRadius: 10,
-                    background: 'oklch(0.93 0.015 260)', display: 'flex',
+                    background: 'var(--bg-tag)', display: 'flex',
                     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}>
                     <Icon name="accounts" size={18}/>
@@ -159,7 +159,7 @@ export function AccountsPage({ accounts, holdings }: Props) {
                 )}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 600 }}>{label}</div>
-                  <div style={{ fontSize: 12.5, color: 'oklch(0.6 0.01 260)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 2 }}>
                     {accts.length} account{accts.length !== 1 ? 's' : ''}
                     {groupBy === 'type' && (() => {
                       const insts = Array.from(new Set(accts.map(a => a.institutionName)));
@@ -170,21 +170,21 @@ export function AccountsPage({ accounts, holdings }: Props) {
                 <div style={{ marginRight: 8 }}>
                   <div style={{
                     fontFamily: "'DM Mono', monospace", fontSize: 17, fontWeight: 500,
-                    color: total >= 0 ? 'oklch(0.15 0.01 260)' : 'oklch(0.5 0.15 20)',
+                    color: total >= 0 ? 'var(--text-primary)' : 'var(--text-negative)',
                   }}>
                     {fmtCents(total)}
                   </div>
                 </div>
                 <div style={{
                   transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.18s', color: 'oklch(0.6 0.01 260)',
+                  transition: 'transform 0.18s', color: 'var(--text-tertiary)',
                 }}>
                   <Icon name="chevron" size={16}/>
                 </div>
               </button>
 
               {open && (
-                <div style={{ borderTop: '1px solid oklch(0.93 0.005 260)' }}>
+                <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
                   {accts.map((a, i) => {
                     const acctHoldings = holdings.filter(
                       h => h.institutionName === a.institutionName && h.accountName === a.accountName,
@@ -206,15 +206,15 @@ export function AccountsPage({ accounts, holdings }: Props) {
                               ? '13px 22px 13px 72px'
                               : '13px 22px 13px 22px',
                             borderBottom: !holdingOpen && !isLast
-                              ? '1px solid oklch(0.95 0.003 260)' : 'none',
-                            background: 'oklch(0.985 0.003 60)',
+                              ? '1px solid var(--border-row)' : 'none',
+                            background: 'var(--bg-row)',
                             cursor: hasHoldings ? 'pointer' : 'default',
                           }}
                           onMouseEnter={hasHoldings
-                            ? e => { (e.currentTarget as HTMLElement).style.background = 'oklch(0.975 0.005 60)'; }
+                            ? e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-row-hover)'; }
                             : undefined}
                           onMouseLeave={hasHoldings
-                            ? e => { (e.currentTarget as HTMLElement).style.background = 'oklch(0.985 0.003 60)'; }
+                            ? e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-row)'; }
                             : undefined}
                         >
                           {groupBy === 'type' && (
@@ -228,8 +228,8 @@ export function AccountsPage({ accounts, holdings }: Props) {
                               {a.accountName}
                               {a.accountId && (
                                 <span style={{
-                                  fontSize: 11, fontWeight: 400, color: 'oklch(0.6 0.01 260)',
-                                  background: 'oklch(0.96 0.005 260)', padding: '2px 6px',
+                                  fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)',
+                                  background: 'var(--bg-tag)', padding: '2px 6px',
                                   borderRadius: 4, fontFamily: "'DM Mono', monospace",
                                 }}>
                                   {a.accountId}
@@ -237,7 +237,7 @@ export function AccountsPage({ accounts, holdings }: Props) {
                               )}
                             </div>
                             <div style={{
-                              fontSize: 12, color: 'oklch(0.6 0.01 260)', marginTop: 4,
+                              fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4,
                               display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
                             }}>
                               {a.accountType && <TypeBadge type={a.accountType}/>}
@@ -250,8 +250,7 @@ export function AccountsPage({ accounts, holdings }: Props) {
                           </div>
                           <div style={{
                             fontFamily: "'DM Mono', monospace", fontSize: 15, fontWeight: 500,
-                            color: (a.amountCents ?? 0) >= 0
-                              ? 'oklch(0.15 0.01 260)' : 'oklch(0.5 0.15 20)',
+                            color: (a.amountCents ?? 0) >= 0 ? 'var(--text-primary)' : 'var(--text-negative)',
                           }}>
                             {fmtCents(a.amountCents)}
                           </div>
@@ -259,7 +258,7 @@ export function AccountsPage({ accounts, holdings }: Props) {
                             <div style={{
                               marginLeft: 6, flexShrink: 0,
                               transform: holdingOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-                              transition: 'transform 0.18s', color: 'oklch(0.6 0.01 260)',
+                              transition: 'transform 0.18s', color: 'var(--text-tertiary)',
                             }}>
                               <Icon name="chevron" size={13}/>
                             </div>
@@ -268,9 +267,9 @@ export function AccountsPage({ accounts, holdings }: Props) {
 
                         {holdingOpen && (
                           <div style={{
-                            background: 'oklch(0.972 0.006 60)',
-                            borderTop: '1px solid oklch(0.93 0.005 260)',
-                            borderBottom: !isLast ? '1px solid oklch(0.95 0.003 260)' : 'none',
+                            background: 'var(--bg-row)',
+                            borderTop: '1px solid var(--border-subtle)',
+                            borderBottom: !isLast ? '1px solid var(--border-row)' : 'none',
                           }}>
                             <div style={{
                               padding: '6px 22px 6px 88px',
@@ -278,9 +277,9 @@ export function AccountsPage({ accounts, holdings }: Props) {
                               gridTemplateColumns: '56px 1fr auto auto',
                               gap: '0 12px',
                               fontSize: 11, fontWeight: 500,
-                              color: 'oklch(0.55 0.01 260)',
+                              color: 'var(--text-secondary)',
                               letterSpacing: '0.03em', textTransform: 'uppercase',
-                              borderBottom: '1px solid oklch(0.93 0.005 260)',
+                              borderBottom: '1px solid var(--border-subtle)',
                             }}>
                               <span>Symbol</span>
                               <span>Name</span>
@@ -298,19 +297,19 @@ export function AccountsPage({ accounts, holdings }: Props) {
                                 <span style={{
                                   fontFamily: "'DM Mono', monospace",
                                   fontSize: 12.5, fontWeight: 600,
-                                  color: 'oklch(0.25 0.01 260)',
+                                  color: 'var(--text-primary)',
                                 }}>
                                   {h.symbol}
                                 </span>
                                 <span style={{
-                                  fontSize: 12.5, color: 'oklch(0.5 0.01 260)',
+                                  fontSize: 12.5, color: 'var(--text-secondary)',
                                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                 }}>
                                   {h.name ?? ''}
                                 </span>
                                 <span style={{
                                   fontFamily: "'DM Mono', monospace",
-                                  fontSize: 11.5, color: 'oklch(0.55 0.01 260)',
+                                  fontSize: 11.5, color: 'var(--text-secondary)',
                                   textAlign: 'right', whiteSpace: 'nowrap',
                                 }}>
                                   {fmtQty(h.quantity)} @ {fmtCents(h.pricePerUnitCents)}
@@ -318,7 +317,7 @@ export function AccountsPage({ accounts, holdings }: Props) {
                                 <span style={{
                                   fontFamily: "'DM Mono', monospace",
                                   fontSize: 13, fontWeight: 500,
-                                  color: 'oklch(0.15 0.01 260)',
+                                  color: 'var(--text-primary)',
                                   textAlign: 'right',
                                 }}>
                                   {fmtCents(h.marketValueCents)}

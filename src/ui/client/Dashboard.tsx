@@ -1,38 +1,58 @@
+import { useEffect, useState } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { useState } from 'react';
 import type { AccountRow, NetWorthPoint, TransactionRow, HoldingRow } from './api';
 import { getInstColor, fmtCents, fmtCentsK } from './utils';
 import { InstBadge } from './InstBadge';
 
-const ACCENT = 260;
+const CHART_LIGHT = {
+  stroke: 'oklch(0.55 0.18 260)',
+  grid:   'oklch(0.93 0.005 260)',
+  tick:   'oklch(0.6 0.01 260)',
+};
+const CHART_DARK = {
+  stroke: 'oklch(0.65 0.18 260)',
+  grid:   'oklch(0.25 0.01 260)',
+  tick:   'oklch(0.55 0.01 260)',
+};
+
+function useDarkMode(): boolean {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const [dark, setDark] = useState(mq.matches);
+  useEffect(() => {
+    const handler = (e: MediaQueryListEvent) => setDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return dark;
+}
 
 function StatCard({ label, value, sub, accent }: {
   label: string; value: string; sub?: string; accent?: 'green' | 'red';
 }) {
-  const borderColor = accent === 'green' ? 'oklch(0.88 0.08 145)'
-    : accent === 'red'   ? 'oklch(0.88 0.08 20)'
-    : 'oklch(0.91 0.005 260)';
-  const valueColor = accent === 'green' ? 'oklch(0.42 0.14 145)'
-    : accent === 'red'   ? 'oklch(0.48 0.15 20)'
-    : 'oklch(0.15 0.01 260)';
+  const borderColor = accent === 'green' ? 'var(--border-accent-green)'
+    : accent === 'red'   ? 'var(--border-accent-red)'
+    : 'var(--border-card)';
+  const valueColor = accent === 'green' ? 'var(--text-positive)'
+    : accent === 'red'   ? 'var(--text-negative)'
+    : 'var(--text-primary)';
 
   return (
     <div style={{
-      background: '#fff', borderRadius: 12,
+      background: 'var(--bg-card)', borderRadius: 12,
       border: `1px solid ${borderColor}`,
       padding: '20px 24px', flex: 1, minWidth: 0,
     }}>
       <div style={{
-        fontSize: 12, color: 'oklch(0.55 0.01 260)', fontWeight: 500,
+        fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500,
         letterSpacing: '0.03em', textTransform: 'uppercase', marginBottom: 8,
       }}>{label}</div>
       <div style={{
         fontFamily: "'DM Mono', monospace", fontSize: 26, fontWeight: 500,
         letterSpacing: '-0.03em', marginBottom: 4, color: valueColor,
       }}>{value}</div>
-      {sub && <div style={{ fontSize: 12.5, color: 'oklch(0.55 0.01 260)' }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{sub}</div>}
     </div>
   );
 }
@@ -53,7 +73,7 @@ function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
-      background: '#fff', border: '1px solid oklch(0.91 0.005 260)',
+      background: 'var(--bg-card)', border: '1px solid var(--border-card)',
       borderRadius: 8, padding: '8px 14px', fontSize: 13,
     }}>
       <div style={{ fontWeight: 500, marginBottom: 2 }}>{label}</div>
@@ -84,23 +104,25 @@ function formatDate(d: Date) {
 }
 
 export function Dashboard({ accounts, history, transactions, holdings, onViewAll }: Props) {
+  const dark = useDarkMode();
+  const chartColors = dark ? CHART_DARK : CHART_LIGHT;
   const [holdingsOpen, setHoldingsOpen] = useState(true);
 
-  const assetAccounts  = accounts.filter(a => (a.amountCents ?? 0) > 0);
-  const debtAccounts   = accounts.filter(a => (a.amountCents ?? 0) < 0);
-  const netWorthCents  = accounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
-  const assetsCents    = assetAccounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
-  const debtCents      = debtAccounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
-  const chartData      = toMonthly(history, 12);
-  const institutions   = Array.from(new Set(accounts.map(a => a.institutionName)));
-  const topHoldings    = holdings.slice(0, 6);
+  const assetAccounts   = accounts.filter(a => (a.amountCents ?? 0) > 0);
+  const debtAccounts    = accounts.filter(a => (a.amountCents ?? 0) < 0);
+  const netWorthCents   = accounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
+  const assetsCents     = assetAccounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
+  const debtCents       = debtAccounts.reduce((s, a) => s + (a.amountCents ?? 0), 0);
+  const chartData       = toMonthly(history, 12);
+  const institutions    = Array.from(new Set(accounts.map(a => a.institutionName)));
+  const topHoldings     = holdings.slice(0, 6);
   const totalHoldingsMv = holdings.reduce((s, h) => s + h.marketValueCents, 0);
 
   return (
     <div style={{ padding: '32px 36px', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em' }}>{greeting()}</h1>
-        <p style={{ fontSize: 14, color: 'oklch(0.55 0.01 260)', marginTop: 3 }}>Here's your financial snapshot for {formatDate(new Date())}.</p>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 3 }}>Here's your financial snapshot for {formatDate(new Date())}.</p>
       </div>
 
       <div style={{ display: 'flex', gap: 14, marginBottom: 28 }}>
@@ -111,10 +133,10 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14 }}>
         <div style={{
-          background: '#fff', borderRadius: 12,
-          border: '1px solid oklch(0.91 0.005 260)', padding: '22px 24px',
+          background: 'var(--bg-card)', borderRadius: 12,
+          border: '1px solid var(--border-card)', padding: '22px 24px',
         }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 18, color: 'oklch(0.35 0.01 260)' }}>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 18, color: 'var(--text-muted)' }}>
             Net Worth
           </div>
           {chartData.length > 0 ? (
@@ -122,19 +144,19 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
               <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="nwGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%"   stopColor={`oklch(0.55 0.18 ${ACCENT})`} stopOpacity={0.15}/>
-                    <stop offset="100%" stopColor={`oklch(0.55 0.18 ${ACCENT})`} stopOpacity={0}/>
+                    <stop offset="0%"   stopColor={chartColors.stroke} stopOpacity={0.15}/>
+                    <stop offset="100%" stopColor={chartColors.stroke} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.93 0.005 260)" vertical={false}/>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} vertical={false}/>
                 <XAxis
                   dataKey="month"
-                  tick={{ fontSize: 11, fill: 'oklch(0.6 0.01 260)' }}
+                  tick={{ fontSize: 11, fill: chartColors.tick }}
                   axisLine={false} tickLine={false}
                 />
                 <YAxis
                   dataKey="valueCents"
-                  tick={{ fontSize: 11, fill: 'oklch(0.6 0.01 260)', fontFamily: "'DM Mono', monospace" }}
+                  tick={{ fontSize: 11, fill: chartColors.tick, fontFamily: "'DM Mono', monospace" }}
                   axisLine={false} tickLine={false}
                   tickFormatter={v => `$${(v / 100000).toFixed(0)}k`}
                   width={42}
@@ -142,7 +164,7 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
                 <Tooltip content={<ChartTooltip/>}/>
                 <Area
                   type="monotone" dataKey="valueCents"
-                  stroke={`oklch(0.55 0.18 ${ACCENT})`} strokeWidth={2}
+                  stroke={chartColors.stroke} strokeWidth={2}
                   fill="url(#nwGrad)" dot={false}
                 />
               </AreaChart>
@@ -150,7 +172,7 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
           ) : (
             <div style={{
               height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'oklch(0.6 0.01 260)', fontSize: 13,
+              color: 'var(--text-tertiary)', fontSize: 13,
             }}>
               No history yet — run a sync to populate the chart.
             </div>
@@ -158,14 +180,14 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
         </div>
 
         <div style={{
-          background: '#fff', borderRadius: 12,
-          border: '1px solid oklch(0.91 0.005 260)', padding: '22px 24px',
+          background: 'var(--bg-card)', borderRadius: 12,
+          border: '1px solid var(--border-card)', padding: '22px 24px',
         }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 18, color: 'oklch(0.35 0.01 260)' }}>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 18, color: 'var(--text-muted)' }}>
             Accounts
           </div>
           {institutions.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'oklch(0.6 0.01 260)' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
               No accounts yet — run a sync to get started.
             </div>
           ) : (
@@ -185,15 +207,13 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
                           fontSize: 12.5, marginBottom: 4,
                         }}>
                           <span style={{ fontWeight: 500 }}>{inst}</span>
-                          <span style={{
-                            fontFamily: "'DM Mono', monospace", color: 'oklch(0.35 0.01 260)',
-                          }}>
+                          <span style={{ fontFamily: "'DM Mono', monospace", color: 'var(--text-muted)' }}>
                             {fmtCentsK(bal)}
                           </span>
                         </div>
                         <div style={{
                           height: 4, borderRadius: 2,
-                          background: 'oklch(0.93 0.005 260)', overflow: 'hidden',
+                          background: 'var(--bg-progress)', overflow: 'hidden',
                         }}>
                           <div style={{
                             height: '100%', width: `${pct}%`,
@@ -217,15 +237,15 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
                     }}
                   >
                     <span style={{
-                      fontSize: 13, fontWeight: 500, color: 'oklch(0.35 0.01 260)',
-                      borderTop: '1px solid oklch(0.93 0.005 260)',
+                      fontSize: 13, fontWeight: 500, color: 'var(--text-muted)',
+                      borderTop: '1px solid var(--border-subtle)',
                       paddingTop: 12, width: '100%', textAlign: 'left', display: 'block',
                     }}>
                       Top Holdings
                     </span>
                     <span style={{
                       transform: holdingsOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.18s', color: 'oklch(0.6 0.01 260)',
+                      transition: 'transform 0.18s', color: 'var(--text-tertiary)',
                       marginTop: 12, flexShrink: 0,
                     }}>▶</span>
                   </button>
@@ -241,26 +261,26 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
                             <span style={{
                               fontFamily: "'DM Mono', monospace", fontSize: 11.5,
                               fontWeight: 600, width: 44, flexShrink: 0,
-                              color: 'oklch(0.25 0.01 260)',
+                              color: 'var(--text-primary)',
                             }}>
                               {h.symbol}
                             </span>
                             <span style={{
                               flex: 1, minWidth: 0, fontSize: 11.5,
-                              color: 'oklch(0.55 0.01 260)',
+                              color: 'var(--text-secondary)',
                               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                             }}>
                               {h.name ?? h.accountName}
                             </span>
                             <span style={{
                               fontFamily: "'DM Mono', monospace", fontSize: 11.5,
-                              color: 'oklch(0.35 0.01 260)', flexShrink: 0,
+                              color: 'var(--text-muted)', flexShrink: 0,
                             }}>
                               {fmtCentsK(h.marketValueCents)}
                             </span>
                             <span style={{
                               fontFamily: "'DM Mono', monospace", fontSize: 10.5,
-                              color: 'oklch(0.6 0.01 260)', flexShrink: 0, width: 30,
+                              color: 'var(--text-tertiary)', flexShrink: 0, width: 30,
                               textAlign: 'right',
                             }}>
                               {pct}%
@@ -278,14 +298,14 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
       </div>
 
       <div style={{
-        marginTop: 14, background: '#fff', borderRadius: 12,
-        border: '1px solid oklch(0.91 0.005 260)', padding: '22px 24px',
+        marginTop: 14, background: 'var(--bg-card)', borderRadius: 12,
+        border: '1px solid var(--border-card)', padding: '22px 24px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'oklch(0.35 0.01 260)' }}>Recent Transactions</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-muted)' }}>Recent Transactions</div>
           {transactions.length > 0 && (
             <button onClick={onViewAll} style={{
-              fontSize: 12, color: `oklch(0.50 0.18 ${ACCENT})`, background: 'none',
+              fontSize: 12, color: 'var(--text-link)', background: 'none',
               border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit',
             }}>
               View all →
@@ -293,7 +313,7 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
           )}
         </div>
         {transactions.length === 0 ? (
-          <div style={{ fontSize: 13, color: 'oklch(0.6 0.01 260)' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
             No transactions yet — run a sync to get started.
           </div>
         ) : (
@@ -303,20 +323,20 @@ export function Dashboard({ accounts, history, transactions, holdings, onViewAll
                 display: 'flex', alignItems: 'center', gap: 14,
                 padding: '10px 0',
                 borderBottom: i < Math.min(transactions.length, 5) - 1
-                  ? '1px solid oklch(0.95 0.003 260)' : 'none',
+                  ? '1px solid var(--border-row)' : 'none',
               }}>
                 <InstBadge name={tx.institutionName} size={28}/>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {tx.description}
                   </div>
-                  <div style={{ fontSize: 12, color: 'oklch(0.6 0.01 260)', marginTop: 1 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>
                     {tx.accountName} · {tx.datetime.slice(0, 10)}
                   </div>
                 </div>
                 <div style={{
                   fontFamily: "'DM Mono', monospace", fontSize: 13.5, fontWeight: 500, flexShrink: 0,
-                  color: tx.amountCents >= 0 ? 'oklch(0.42 0.14 145)' : 'oklch(0.15 0.01 260)',
+                  color: tx.amountCents >= 0 ? 'var(--text-positive)' : 'var(--text-primary)',
                 }}>
                   {tx.amountCents >= 0 ? '+' : ''}{fmtCents(tx.amountCents)}
                 </div>

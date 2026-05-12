@@ -24,7 +24,7 @@ export function TransactionsPage({ transactions }: Props) {
     <div style={{ padding: '32px 36px', maxWidth: 900, margin: '0 auto' }}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em' }}>Transactions</h1>
-        <p style={{ fontSize: 14, color: 'oklch(0.55 0.01 260)', marginTop: 3 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 3 }}>
           {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
           {days.length > 0 && ` · ${formatDateHeading(days[days.length - 1])} – ${formatDateHeading(days[0])}`}
         </p>
@@ -32,10 +32,10 @@ export function TransactionsPage({ transactions }: Props) {
 
       {transactions.length === 0 && (
         <div style={{
-          background: '#fff', borderRadius: 12,
-          border: '1px solid oklch(0.91 0.005 260)',
+          background: 'var(--bg-card)', borderRadius: 12,
+          border: '1px solid var(--border-card)',
           padding: '40px 24px', textAlign: 'center',
-          color: 'oklch(0.6 0.01 260)', fontSize: 14,
+          color: 'var(--text-tertiary)', fontSize: 14,
         }}>
           No transactions yet — run a sync to get started.
         </div>
@@ -53,39 +53,39 @@ export function TransactionsPage({ transactions }: Props) {
               }}>
                 <div style={{
                   fontSize: 12, fontWeight: 600, letterSpacing: '0.04em',
-                  textTransform: 'uppercase', color: 'oklch(0.55 0.01 260)',
+                  textTransform: 'uppercase', color: 'var(--text-secondary)',
                 }}>
                   {formatDateHeading(day)}
                 </div>
                 <div style={{
                   fontSize: 12, fontFamily: "'DM Mono', monospace",
-                  color: dayTotal >= 0 ? 'oklch(0.42 0.14 145)' : 'oklch(0.55 0.01 260)',
+                  color: dayTotal >= 0 ? 'var(--text-positive)' : 'var(--text-secondary)',
                 }}>
                   {dayTotal >= 0 ? '+' : ''}{fmtCents(dayTotal)}
                 </div>
               </div>
 
               <div style={{
-                background: '#fff', borderRadius: 12,
-                border: '1px solid oklch(0.91 0.005 260)', overflow: 'hidden',
+                background: 'var(--bg-card)', borderRadius: 12,
+                border: '1px solid var(--border-card)', overflow: 'hidden',
               }}>
                 {txs.map((tx, i) => (
                   <div key={tx.id} style={{
                     display: 'flex', alignItems: 'center', gap: 14,
                     padding: '13px 20px',
-                    borderBottom: i < txs.length - 1 ? '1px solid oklch(0.95 0.003 260)' : 'none',
+                    borderBottom: i < txs.length - 1 ? '1px solid var(--border-row)' : 'none',
                   }}>
                     <InstBadge name={tx.institutionName} size={32}/>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 500 }}>{tx.description}</div>
-                      <div style={{ fontSize: 12, color: 'oklch(0.6 0.01 260)', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
                         {tx.institutionName} · {tx.accountName}
                         {tx.currency && ` · ${tx.currency}`}
                       </div>
                     </div>
                     <div style={{
                       fontFamily: "'DM Mono', monospace", fontSize: 14, fontWeight: 500, flexShrink: 0,
-                      color: tx.amountCents >= 0 ? 'oklch(0.42 0.14 145)' : 'oklch(0.15 0.01 260)',
+                      color: tx.amountCents >= 0 ? 'var(--text-positive)' : 'var(--text-primary)',
                     }}>
                       {tx.amountCents >= 0 ? '+' : ''}{fmtCents(tx.amountCents)}
                     </div>

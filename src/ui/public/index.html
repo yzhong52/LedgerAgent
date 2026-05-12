@@ -10,15 +10,88 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
+
+    :root {
+      --bg-page:       oklch(0.975 0.004 60);
+      --bg-card:       #fff;
+      --bg-sidebar:    oklch(0.99 0.003 60);
+      --bg-row:        oklch(0.985 0.003 60);
+      --bg-row-hover:  oklch(0.98 0.003 60);
+      --bg-tag:        oklch(0.96 0.005 260);
+      --bg-progress:   oklch(0.93 0.005 260);
+      --bg-nav-active: oklch(0.94 0.04 260);
+      --bg-nav-hover:  oklch(0.95 0.005 260);
+      --demo-bg:       oklch(0.94 0.08 88);
+      --demo-bg-hover: oklch(0.89 0.10 88);
+      --demo-fg:       oklch(0.42 0.14 88);
+
+      --border-card:        oklch(0.91 0.005 260);
+      --border-subtle:      oklch(0.93 0.005 260);
+      --border-row:         oklch(0.95 0.003 260);
+      --border-sidebar:     oklch(0.92 0.005 260);
+      --border-input:       oklch(0.88 0.005 260);
+      --border-accent-green: oklch(0.88 0.08 145);
+      --border-accent-red:   oklch(0.88 0.08 20);
+
+      --text-primary:    oklch(0.15 0.01 260);
+      --text-secondary:  oklch(0.55 0.01 260);
+      --text-tertiary:   oklch(0.6 0.01 260);
+      --text-muted:      oklch(0.35 0.01 260);
+      --text-nav:        oklch(0.45 0.01 260);
+      --text-nav-active: oklch(0.45 0.18 260);
+      --text-link:       oklch(0.50 0.18 260);
+      --text-positive:   oklch(0.42 0.14 145);
+      --text-negative:   oklch(0.48 0.15 20);
+
+      --scrollbar-thumb: oklch(0.85 0.005 260);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-page:       oklch(0.13 0.01 260);
+        --bg-card:       oklch(0.18 0.01 260);
+        --bg-sidebar:    oklch(0.16 0.01 260);
+        --bg-row:        oklch(0.21 0.01 260);
+        --bg-row-hover:  oklch(0.22 0.01 260);
+        --bg-tag:        oklch(0.25 0.01 260);
+        --bg-progress:   oklch(0.27 0.01 260);
+        --bg-nav-active: oklch(0.27 0.06 260);
+        --bg-nav-hover:  oklch(0.23 0.01 260);
+        --demo-bg:       oklch(0.32 0.08 88);
+        --demo-bg-hover: oklch(0.28 0.10 88);
+        --demo-fg:       oklch(0.78 0.14 88);
+
+        --border-card:        oklch(0.27 0.01 260);
+        --border-subtle:      oklch(0.25 0.01 260);
+        --border-row:         oklch(0.23 0.01 260);
+        --border-sidebar:     oklch(0.25 0.01 260);
+        --border-input:       oklch(0.30 0.01 260);
+        --border-accent-green: oklch(0.30 0.08 145);
+        --border-accent-red:   oklch(0.30 0.08 20);
+
+        --text-primary:    oklch(0.92 0.01 260);
+        --text-secondary:  oklch(0.65 0.01 260);
+        --text-tertiary:   oklch(0.60 0.01 260);
+        --text-muted:      oklch(0.70 0.01 260);
+        --text-nav:        oklch(0.60 0.01 260);
+        --text-nav-active: oklch(0.75 0.15 260);
+        --text-link:       oklch(0.70 0.15 260);
+        --text-positive:   oklch(0.65 0.14 145);
+        --text-negative:   oklch(0.65 0.15 20);
+
+        --scrollbar-thumb: oklch(0.35 0.005 260);
+      }
+    }
+
     body {
       font-family: 'DM Sans', sans-serif;
-      background: oklch(0.975 0.004 60);
-      color: oklch(0.15 0.01 260);
+      background: var(--bg-page);
+      color: var(--text-primary);
       -webkit-font-smoothing: antialiased;
     }
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: oklch(0.85 0.005 260); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
   </style>
 </head>
 <body>

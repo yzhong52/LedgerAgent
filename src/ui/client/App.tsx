@@ -70,12 +70,12 @@ export function App() {
       <Sidebar page={page} setPage={navigate} demo={demo} setDemo={d => { saveDemo(d); setDemo(d); }}/>
       <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 60 }}>
         {loading && (
-          <div style={{ padding: '32px 36px', color: 'oklch(0.6 0.01 260)', fontSize: 14 }}>
+          <div style={{ padding: '32px 36px', color: 'var(--text-tertiary)', fontSize: 14 }}>
             Loading…
           </div>
         )}
         {error && (
-          <div style={{ padding: '32px 36px', color: 'oklch(0.5 0.15 20)', fontSize: 14 }}>
+          <div style={{ padding: '32px 36px', color: 'var(--text-negative)', fontSize: 14 }}>
             Error: {error}
           </div>
         )}
