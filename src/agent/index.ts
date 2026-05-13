@@ -67,23 +67,13 @@ function isSnapshotBlock(block: unknown): boolean {
   );
 }
 
-// Replace all but the last snapshot in the conversation with a tiny placeholder.
-// Only the latest page state is useful to Claude; earlier snapshots just burn tokens.
-// The original messages array is not mutated — logs still record the full history.
-function compressHistory(messages: MessageParam[]): MessageParam[] {
-  let lastSnapshotIdx = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg.role === 'user' && Array.isArray(msg.content) && msg.content.some(isSnapshotBlock)) {
-      lastSnapshotIdx = i;
-      break;
-    }
-  }
-  return messages.map((msg, i) => {
-    if (i === lastSnapshotIdx || msg.role !== 'user' || !Array.isArray(msg.content)) return msg;
-    const newContent = (msg.content as unknown[]).map(b => isSnapshotBlock(b) ? SNAPSHOT_PLACEHOLDER : b);
-    return { ...msg, content: newContent } as MessageParam;
-  });
+// Replace snapshot blocks in a single message with the placeholder.
+// Called once per turn when archiving the outgoing user message into history,
+// so messages[] stays permanently compressed and needs no re-scan each turn.
+function compressMsg(msg: MessageParam): MessageParam {
+  if (!Array.isArray(msg.content)) return msg;
+  const newContent = (msg.content as unknown[]).map(b => isSnapshotBlock(b) ? SNAPSHOT_PLACEHOLDER : b);
+  return { ...msg, content: newContent } as MessageParam;
 }
 
 function sessionHostSlug(folderName: string): string | null {
@@ -180,21 +170,24 @@ export async function runAgent<T>(
     return snap;
   }
 
-  const messages: MessageParam[] = [{
+  // messages holds compressed history; pendingUserMsg is the current (uncompressed) user turn.
+  // The API receives [...messages, pendingUserMsg] — all prior snapshots are already compressed,
+  // only the latest snapshot is live. After the response, pendingUserMsg is compressed once
+  // and archived into messages. No re-scan of the full history on each turn.
+  const messages: MessageParam[] = [];
+  let pendingUserMsg: MessageParam = {
     role: 'user',
     content: [{ type: 'text', text: initialMessage }, pageStateMessage(await takeSnapshot())],
-  }];
+  };
 
   const logFile = `${sessionDir}/${logName}.md`;
   await fs.writeFile(logFile, `# ${path.basename(sessionDir)} — ${logName}\n\n## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`);
 
   for (let turn = 0; turn < maxTurns; turn++) {
-    const lastMsg = messages[messages.length - 1];
     if (turn > 0) await fs.appendFile(logFile, '---\n\n');
     await fs.appendFile(logFile, `## Turn ${turn}\n\n`);
     await fs.appendFile(logFile, `### User → Agent\n\n`);
-    await fs.appendFile(logFile, `\`\`\`json\n${redactSensitive(JSON.stringify(lastMsg.content, null, 2))}\n\`\`\`\n\n`);
-    await fs.appendFile(logFile, `### Agent → User\n\n`);
+    await fs.appendFile(logFile, `\`\`\`json\n${redactSensitive(JSON.stringify(pendingUserMsg.content, null, 2))}\n\`\`\`\n\n`);
 
     const response = await getClient().messages.create({
       model: MODEL,
@@ -202,14 +195,16 @@ export async function runAgent<T>(
       system: systemPrompt,
       tools,
       tool_choice: { type: 'any' },
-      messages: compressHistory(messages),
+      messages: [...messages, pendingUserMsg],
     });
 
+    await fs.appendFile(logFile, `### Agent → User\n\n`);
     await fs.appendFile(
       logFile,
       `\`\`\`json\n${redactSensitive(JSON.stringify(response, null, 2))}\n\`\`\`\n\n`,
     );
 
+    messages.push(compressMsg(pendingUserMsg));
     messages.push({ role: 'assistant', content: response.content });
 
     const toolUses = response.content.filter((b): b is ToolUseBlock => b.type === 'tool_use');
@@ -273,7 +268,7 @@ export async function runAgent<T>(
     if (!result) {
       // Take one snapshot after all tools in this turn complete, so Claude sees the
       // cumulative page state rather than intermediate states between tool calls.
-      messages.push({ role: 'user', content: [...toolResults, pageStateMessage(await takeSnapshot())] });
+      pendingUserMsg = { role: 'user', content: [...toolResults, pageStateMessage(await takeSnapshot())] };
     } else {
       return result.value;
     }
