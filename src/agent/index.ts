@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { MessageParam, Tool, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
+import type { ContentBlockParam, MessageParam, Tool, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
 import type { Page } from 'playwright';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -154,28 +154,24 @@ export async function runAgent<T>(
     return snap;
   }
 
-  // messages holds compressed history; pendingUserMsg is the current (uncompressed) user turn.
-  // pendingUserMsgCompressed is built alongside it with the snapshot replaced by a placeholder.
-  // The API receives [...messages, pendingUserMsg] so Claude sees the live snapshot each turn;
-  // pendingUserMsgCompressed is what gets archived into messages after the response.
+  // messages holds compressed history. pendingPrefix is the non-snapshot content for the next
+  // user turn (initial message block, or tool results). At the top of each turn a snapshot is
+  // taken and appended to form the live userContent sent to the API; SNAPSHOT_PLACEHOLDER is
+  // appended instead when archiving into messages.
   const messages: MessageParam[] = [];
-  let pendingUserMsg: MessageParam = {
-    role: 'user',
-    content: [{ type: 'text', text: initialMessage }, pageStateMessage(await takeSnapshot())],
-  };
-  let pendingUserMsgCompressed: MessageParam = {
-    role: 'user',
-    content: [{ type: 'text', text: initialMessage }, SNAPSHOT_PLACEHOLDER],
-  };
+  const initialBlock = { type: 'text' as const, text: initialMessage };
+  let pendingPrefix: ContentBlockParam[] = [initialBlock];
 
   const logFile = `${sessionDir}/${logName}.md`;
   await fs.writeFile(logFile, `# ${path.basename(sessionDir)} — ${logName}\n\n## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`);
 
   for (let turn = 0; turn < maxTurns; turn++) {
+    const userContent = [...pendingPrefix, pageStateMessage(await takeSnapshot())];
+
     if (turn > 0) await fs.appendFile(logFile, '---\n\n');
     await fs.appendFile(logFile, `## Turn ${turn}\n\n`);
     await fs.appendFile(logFile, `### User → Agent\n\n`);
-    await fs.appendFile(logFile, `\`\`\`json\n${redactSensitive(JSON.stringify(pendingUserMsg.content, null, 2))}\n\`\`\`\n\n`);
+    await fs.appendFile(logFile, `\`\`\`json\n${redactSensitive(JSON.stringify(userContent, null, 2))}\n\`\`\`\n\n`);
 
     const response = await getClient().messages.create({
       model: MODEL,
@@ -183,7 +179,7 @@ export async function runAgent<T>(
       system: systemPrompt,
       tools,
       tool_choice: { type: 'any' },
-      messages: [...messages, pendingUserMsg],
+      messages: [...messages, { role: 'user', content: userContent }],
     });
 
     await fs.appendFile(logFile, `### Agent → User\n\n`);
@@ -192,7 +188,7 @@ export async function runAgent<T>(
       `\`\`\`json\n${redactSensitive(JSON.stringify(response, null, 2))}\n\`\`\`\n\n`,
     );
 
-    messages.push(pendingUserMsgCompressed);
+    messages.push({ role: 'user', content: [...pendingPrefix, SNAPSHOT_PLACEHOLDER] });
     messages.push({ role: 'assistant', content: response.content });
 
     const toolUses = response.content.filter((b): b is ToolUseBlock => b.type === 'tool_use');
@@ -256,8 +252,7 @@ export async function runAgent<T>(
     if (!result) {
       // Take one snapshot after all tools in this turn complete, so Claude sees the
       // cumulative page state rather than intermediate states between tool calls.
-      pendingUserMsg = { role: 'user', content: [...toolResults, pageStateMessage(await takeSnapshot())] };
-      pendingUserMsgCompressed = { role: 'user', content: [...toolResults, SNAPSHOT_PLACEHOLDER] };
+      pendingPrefix = toolResults;
     } else {
       return result.value;
     }
