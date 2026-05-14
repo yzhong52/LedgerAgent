@@ -32,6 +32,14 @@ export function Icon({ name, size = 16 }: IconProps) {
               stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     ),
+    holdings: (
+      <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+        <rect x="1"  y="7" width="3" height="8" rx="1" fill="currentColor" opacity=".5"/>
+        <rect x="6"  y="3" width="3" height="12" rx="1" fill="currentColor" opacity=".8"/>
+        <rect x="11" y="5" width="3" height="10" rx="1" fill="currentColor"/>
+        <path d="M1.5 6L6 2.5l5 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
     demo: (
       <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
         <path d="M6 1.5h4M6 1.5V6L2.5 13h11L10 6V1.5"

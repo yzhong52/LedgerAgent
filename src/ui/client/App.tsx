@@ -7,12 +7,13 @@ import { Sidebar, type Page } from './Sidebar';
 import { Dashboard } from './Dashboard';
 import { AccountsPage } from './AccountsTable';
 import { TransactionsPage } from './TransactionsPage';
+import { HoldingsPage } from './HoldingsPage';
 
 const PATHS: Record<Page, string> = {
-  dashboard: '/', accounts: '/accounts', transactions: '/transactions',
+  dashboard: '/', accounts: '/accounts', holdings: '/holdings', transactions: '/transactions',
 };
 const PAGES: Record<string, Page> = {
-  '/': 'dashboard', '/accounts': 'accounts', '/transactions': 'transactions',
+  '/': 'dashboard', '/accounts': 'accounts', '/holdings': 'holdings', '/transactions': 'transactions',
 };
 
 const DEMO_STORAGE_KEY = 'ledgeragent:demo';
@@ -87,6 +88,9 @@ export function App() {
         )}
         {!loading && !error && page === 'accounts' && (
           <AccountsPage accounts={accounts} holdings={holdings}/>
+        )}
+        {!loading && !error && page === 'holdings' && (
+          <HoldingsPage holdings={holdings}/>
         )}
         {!loading && !error && page === 'transactions' && (
           <TransactionsPage transactions={transactions}/>

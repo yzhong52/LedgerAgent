@@ -1,6 +1,6 @@
 import { Icon } from './Icons';
 
-export type Page = 'dashboard' | 'accounts' | 'transactions';
+export type Page = 'dashboard' | 'accounts' | 'transactions' | 'holdings';
 
 interface SidebarProps {
   page: Page;
@@ -12,6 +12,7 @@ interface SidebarProps {
 const NAV: { id: Page; label: string; icon: string }[] = [
   { id: 'dashboard',    label: 'Overview',     icon: 'overview'      },
   { id: 'accounts',     label: 'Accounts',     icon: 'accounts'      },
+  { id: 'holdings',     label: 'Holdings',     icon: 'holdings'      },
   { id: 'transactions', label: 'Transactions', icon: 'transactions'  },
 ];
 
