@@ -5,7 +5,6 @@ import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browse
 import { TRANSACTION_TOOL } from '../agent/tools';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
-  loadInstitutionalKnowledge, formatKnowledgeForPrompt,
   generateSessionNotes, type ToolEvent,
 } from '../memory';
 import type { Account } from './accounts';
@@ -83,7 +82,6 @@ const TRACKED_TOOLS = new Set<string>([
 
 function buildSystemPrompt(
   notes: string,
-  knowledge: string,
   account: Pick<Account, 'name' | 'accountId'>,
   lookbackDays: number,
   sinceDate: string,
@@ -109,7 +107,7 @@ have collected all transactions back to ${sinceDate}.
 5. Once you have everything, call ${REPORT_TRANSACTIONS} with the full list.
 
 Do not navigate to other accounts. Do not log out.
-${formatKnowledgeForPrompt(knowledge)}${formatMemoryForPrompt(notes, MEMORY_TASK)}`;
+${formatMemoryForPrompt(notes, MEMORY_TASK)}`;
 }
 
 export async function fetchTransactions(
@@ -126,10 +124,7 @@ export async function fetchTransactions(
     .toISOString()
     .slice(0, 10);
 
-  const [notes, knowledge] = await Promise.all([
-    loadMemoryNotes(institutionName, MEMORY_TASK),
-    loadInstitutionalKnowledge(institutionName, MEMORY_TASK),
-  ]);
+  const notes = await loadMemoryNotes(institutionName, MEMORY_TASK);
   const events: ToolEvent[] = [];
 
   const track = (description: string, outcome: 'success' | 'error', error?: string) =>
@@ -139,7 +134,7 @@ export async function fetchTransactions(
     return await runAgent<Transaction[]>(
       page,
       TOOLS,
-      buildSystemPrompt(notes, knowledge, account, lookbackDays, sinceDate),
+      buildSystemPrompt(notes, account, lookbackDays, sinceDate),
       `Please fetch transactions for account ${account.name} from ${sinceDate} to today.`,
       async (name, input, pg) => {
         if (name === REPORT_TRANSACTIONS) {

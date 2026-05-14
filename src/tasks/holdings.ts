@@ -5,7 +5,6 @@ import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browse
 import { HOLDING_TOOL } from '../agent/tools';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
-  loadInstitutionalKnowledge, formatKnowledgeForPrompt,
   generateSessionNotes, type ToolEvent,
 } from '../memory';
 import type { Account } from './accounts';
@@ -95,7 +94,6 @@ const TRACKED_TOOLS = new Set<string>([
 
 function buildSystemPrompt(
   notes: string,
-  knowledge: string,
   account: Pick<Account, 'name' | 'accountId'>,
 ): string {
   const accountLabel = account.accountId
@@ -123,7 +121,7 @@ of the options match the target account name or ID (${account.accountId ?? 'unkn
 ${REPORT_HOLDINGS_NOT_AVAILABLE} immediately.
 
 Do not navigate to other accounts. Do not log out.
-${formatKnowledgeForPrompt(knowledge)}${formatMemoryForPrompt(notes, MEMORY_TASK)}`;
+${formatMemoryForPrompt(notes, MEMORY_TASK)}`;
 }
 
 export async function exploreHoldings(
@@ -135,10 +133,7 @@ export async function exploreHoldings(
   console.log(SEPARATOR);
   console.log(`🤖 Fetching holdings for ${account.name}... ⏳`);
 
-  const [notes, knowledge] = await Promise.all([
-    loadMemoryNotes(institutionName, MEMORY_TASK),
-    loadInstitutionalKnowledge(institutionName, MEMORY_TASK),
-  ]);
+  const notes = await loadMemoryNotes(institutionName, MEMORY_TASK);
   const events: ToolEvent[] = [];
 
   const track = (description: string, outcome: 'success' | 'error', error?: string) =>
@@ -148,7 +143,7 @@ export async function exploreHoldings(
     return await runAgent<Holding[]>(
       page,
       TOOLS,
-      buildSystemPrompt(notes, knowledge, account),
+      buildSystemPrompt(notes, account),
       `Please fetch all holdings for account ${account.name}.`,
       async (name, input, pg) => {
         if (name === REPORT_HOLDINGS) {

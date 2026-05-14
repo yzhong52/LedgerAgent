@@ -246,7 +246,7 @@ export async function runAgent<T>(
           output = redactSensitive(`error: ${err instanceof Error ? err.message : String(err)}`);
           const callKey = `${toolUse.name}:${JSON.stringify(toolUse.input)}`;
           if (seenCalls.has(callKey)) {
-            output += '\n\nThis exact call already failed before. Do NOT retry it — use a different tool or selector instead.';
+            output += `\n\nThis exact call already failed before: ${toolUse.name}(${JSON.stringify(toolUse.input)}). Do NOT retry it.`;
           } else {
             seenCalls.set(callKey, output);
           }

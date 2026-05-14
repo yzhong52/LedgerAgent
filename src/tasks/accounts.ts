@@ -5,7 +5,6 @@ import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browse
 import { ACCOUNT_TOOL } from '../agent/tools';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
-  loadInstitutionalKnowledge, formatKnowledgeForPrompt,
   generateSessionNotes, type ToolEvent,
 } from '../memory';
 
@@ -97,7 +96,6 @@ const TRACKED_TOOLS = new Set<string>([
 
 function buildSystemPrompt(
   notes: string,
-  knowledge: string,
   existingAccounts: Pick<Account, 'name' | 'type' | 'currency' | 'accountId'>[],
 ): string {
   let existingAccountsMsg = '';
@@ -122,7 +120,7 @@ Steps:
    - Set "currency" to the ISO 4217 code (e.g. "USD") only when the account is in a non-default foreign currency. Omit it for domestic accounts.
 ${existingAccountsMsg}
 Do not navigate away from the dashboard. Do not click login/logout links.
-${formatKnowledgeForPrompt(knowledge)}${formatMemoryForPrompt(notes, 'accounts')}`;
+${formatMemoryForPrompt(notes, 'accounts')}`;
 }
 
 export async function exploreAccounts(
@@ -134,10 +132,7 @@ export async function exploreAccounts(
   console.log(SEPARATOR);
   console.log('🤖 Exploring accounts... ⏳');
 
-  const [notes, knowledge] = await Promise.all([
-    loadMemoryNotes(institutionName, MEMORY_TASK),
-    loadInstitutionalKnowledge(institutionName, MEMORY_TASK),
-  ]);
+  const notes = await loadMemoryNotes(institutionName, MEMORY_TASK);
   const events: ToolEvent[] = [];
 
   const track = (description: string, outcome: 'success' | 'error', error?: string) =>
@@ -147,7 +142,7 @@ export async function exploreAccounts(
     return await runAgent<Account[]>(
       page,
       TOOLS,
-      buildSystemPrompt(notes, knowledge, existingAccounts),
+      buildSystemPrompt(notes, existingAccounts),
       'The user is now logged in.',
       async (name, input, pg) => {
         if (name === REPORT_ACCOUNTS) {

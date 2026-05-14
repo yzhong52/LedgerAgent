@@ -108,22 +108,6 @@ export function formatMemoryForPrompt(notes: string, task: string): string {
   return `\nNotes from previous ${task} sessions for this institution:\n${notes}`;
 }
 
-function knowledgePath(institutionName: string, task: string): string {
-  return path.join(process.cwd(), 'institutional_knowledge', memorySlug(institutionName), `${task}.md`);
-}
-
-export async function loadInstitutionalKnowledge(institutionName: string, task: string): Promise<string> {
-  try {
-    return (await fs.readFile(knowledgePath(institutionName, task), 'utf-8')).trim();
-  } catch {
-    return '';
-  }
-}
-
-export function formatKnowledgeForPrompt(knowledge: string): string {
-  if (!knowledge) return '';
-  return `\nInstitutional knowledge:\n${knowledge}`;
-}
 
 export async function generateSessionNotes(
   events: ToolEvent[], taskContext: string,
