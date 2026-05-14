@@ -11,6 +11,7 @@ import { keychainLoadApiKey } from '../keychain';
 
 export const MODEL = 'claude-sonnet-4-6';
 export const MAX_TURNS = 20;
+export const SEPARATOR = '─'.repeat(60);
 
 function briefInput(input: Record<string, unknown>): string {
   if (input.role && input.name) return `${input.role} "${input.name}"`;
@@ -120,10 +121,6 @@ export async function runAgent<T>(
   maxTurns: number,
   maxTokens: number,
 ): Promise<T> {
-  const fullSystemPrompt = systemPrompt +
-    '\n\nIMPORTANT: If a tool call returns an error, do not retry it with the same arguments. ' +
-    'Switch to a different tool or a different selector/approach instead.';
-
   let snapCount = 0;
   const redactSensitive = (text: string) => redact(text, sensitiveValues);
   const snapshotsDir = `${sessionDir}/snapshots`;
@@ -168,7 +165,7 @@ export async function runAgent<T>(
   let pendingPrefix: ContentBlockParam[] = [initialBlock];
 
   const logFile = `${sessionDir}/${logName}.md`;
-  await fs.writeFile(logFile, `# ${path.basename(sessionDir)} — ${logName}\n\n## System Prompt\n\n${redactSensitive(fullSystemPrompt)}\n\n`);
+  await fs.writeFile(logFile, `# ${path.basename(sessionDir)} — ${logName}\n\n## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`);
 
   // Tracks calls that have already failed, keyed by "toolName:JSON(input)".
   // When the same call fails a second time, the error is annotated with a hint
@@ -189,7 +186,7 @@ export async function runAgent<T>(
     const response = await getClient().messages.create({
       model: MODEL,
       max_tokens: maxTokens,
-      system: fullSystemPrompt,
+      system: systemPrompt,
       tools,
       tool_choice: { type: 'any' },
       messages: [...messages, { role: 'user', content: userContent }],

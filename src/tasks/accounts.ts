@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
-import { runAgent, toolDone, MAX_TURNS } from '../agent';
+import { runAgent, toolDone, MAX_TURNS, SEPARATOR } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
 import { ACCOUNT_TOOL } from '../agent/tools';
 import {
@@ -131,6 +131,7 @@ export async function exploreAccounts(
   sessionDir: string,
   existingAccounts: Pick<Account, 'name' | 'type' | 'currency' | 'accountId'>[] = [],
 ): Promise<Account[]> {
+  console.log(SEPARATOR);
   console.log('🤖 Exploring accounts... ⏳');
 
   const [notes, knowledge] = await Promise.all([

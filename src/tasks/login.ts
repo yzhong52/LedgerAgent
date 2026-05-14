@@ -1,7 +1,7 @@
 import type { Page } from 'playwright';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import * as readline from 'readline';
-import { runAgent, toolDone, MAX_TURNS } from '../agent';
+import { runAgent, toolDone, MAX_TURNS, SEPARATOR } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, byRole, executeBrowserTool } from '../agent/browser';
 import { LOGIN_TOOL } from '../agent/tools';
 import { fetchMfaCode } from '../gmail';
@@ -143,6 +143,7 @@ export async function login(
 
   await page.goto(url, { waitUntil: 'load' });
 
+  console.log(SEPARATOR);
   console.log('🤖 Starting login... ⏳');
 
   let loginSucceeded = false;

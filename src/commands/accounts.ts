@@ -6,7 +6,7 @@ import { createSession } from '../agent';
 import { keychainLoad } from '../keychain';
 import { openDb } from '../db';
 import { saveSync, saveHoldings, listAccounts, mergeAccounts, type AccountRow, type AccountSyncDiff } from '../db/storage';
-import { prompt, readInstitutions, printAccountsTable, formatCents, selectFromList, launchBrowser } from './utils';
+import { prompt, readInstitutions, printAccountsTable, printHoldingsTable, formatCents, selectFromList, launchBrowser } from './utils';
 
 function accountLabels(rows: AccountRow[], { showInstitution }: { showInstitution: boolean }): string[] {
   const items = rows.map(row => {
@@ -155,7 +155,8 @@ export function makeAccountsCommand(): Command {
             if (!row) continue;
             const holdings = await exploreHoldings(page, inst.name, account, sessionDir);
             saveHoldings(db, row.id, holdings);
-            console.log(`   Holdings for ${account.name}: ${holdings.length} position(s)`);
+            console.log(`  Holdings for ${account.name}:`);
+            printHoldingsTable(holdings);
           }
 
           console.log();

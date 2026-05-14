@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import type { BrowserContext } from 'playwright';
 import { DATA_DIR } from '../db';
 import { applyDemo } from './demo_utils';
+import type { Holding } from '../tasks/holdings';
 
 export interface Institution {
   name: string;
@@ -123,6 +124,63 @@ export function printAccountsTable(
   for (const e of formatted) {
     console.log(`  ${fmt(e)}`);
   }
+  console.log();
+}
+
+export function printHoldingsTable(holdings: Holding[]): void {
+  if (holdings.length === 0) {
+    console.log('  (no positions)');
+    return;
+  }
+
+  const showName      = holdings.some(h => h.name != null);
+  const showCostBasis = holdings.some(h => h.costBasis != null);
+
+  const rows = holdings.map(h => ({
+    symbol:      h.symbol,
+    name:        h.name ?? '',
+    qty:         h.quantity.toLocaleString('en-CA', { maximumFractionDigits: 6 }),
+    price:       formatCents(Math.round(h.pricePerUnit * 100)),
+    marketValue: h.currency && h.currency !== 'CAD'
+      ? `${h.currency} ${formatCents(Math.round(h.marketValue * 100))}`
+      : formatCents(Math.round(h.marketValue * 100)),
+    costBasis:   h.costBasis != null ? formatCents(Math.round(h.costBasis * 100)) : '—',
+  }));
+
+  const w = {
+    symbol:      Math.max('Symbol'.length,       ...rows.map(r => r.symbol.length)),
+    name:        Math.max('Name'.length,         ...rows.map(r => r.name.length)),
+    qty:         Math.max('Qty'.length,          ...rows.map(r => r.qty.length)),
+    price:       Math.max('Price'.length,        ...rows.map(r => r.price.length)),
+    marketValue: Math.max('Market Value'.length, ...rows.map(r => r.marketValue.length)),
+    costBasis:   Math.max('Cost Basis'.length,   ...rows.map(r => r.costBasis.length)),
+  };
+
+  const fmt = (r: typeof rows[number]) => [
+    r.symbol.padEnd(w.symbol),
+    showName      ? r.name.padEnd(w.name)           : null,
+    r.qty.padStart(w.qty),
+    r.price.padStart(w.price),
+    r.marketValue.padStart(w.marketValue),
+    showCostBasis ? r.costBasis.padStart(w.costBasis) : null,
+  ].filter(Boolean).join('  ');
+
+  const header = fmt({
+    symbol: 'Symbol', name: 'Name', qty: 'Qty', price: 'Price',
+    marketValue: 'Market Value', costBasis: 'Cost Basis',
+  });
+  const divider = fmt({
+    symbol:      '-'.repeat(w.symbol),
+    name:        '-'.repeat(w.name),
+    qty:         '-'.repeat(w.qty),
+    price:       '-'.repeat(w.price),
+    marketValue: '-'.repeat(w.marketValue),
+    costBasis:   '-'.repeat(w.costBasis),
+  });
+
+  console.log(`  ${header}`);
+  console.log(`  ${divider}`);
+  for (const r of rows) console.log(`  ${fmt(r)}`);
   console.log();
 }
 

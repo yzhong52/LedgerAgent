@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
-import { runAgent, toolDone } from '../agent';
+import { runAgent, toolDone, SEPARATOR } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
 import { TRANSACTION_TOOL } from '../agent/tools';
 import {
@@ -119,6 +119,7 @@ export async function fetchTransactions(
   lookbackDays: number,
   sessionDir: string,
 ): Promise<Transaction[]> {
+  console.log(SEPARATOR);
   console.log(`🤖 Fetching transactions for ${account.name}... ⏳`);
 
   const sinceDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000)
