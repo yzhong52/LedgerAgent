@@ -71,6 +71,7 @@ export interface AccountEntry {
   type: string;
   currency?: string;
   balance: string;
+  lastUpdated: string;
 }
 
 export function printAccountsTable(
@@ -78,7 +79,7 @@ export function printAccountsTable(
   { demo, showInstitution }: { demo: boolean; showInstitution: boolean },
 ): void {
   if (demo) entries = entries.map(applyDemo);
-  const headers = { account: 'Account', accountId: 'ID', type: 'Type', balance: 'Balance' };
+  const headers = { account: 'Account', accountId: 'ID', type: 'Type', balance: 'Balance', lastUpdated: 'Last Updated' };
   const showAccountId = entries.some(e => e.accountId != null);
 
   const formatted = entries.map(e => ({
@@ -86,7 +87,7 @@ export function printAccountsTable(
     balance: e.currency && e.balance !== '—' ? `${e.currency} ${e.balance}` : e.balance,
   }));
 
-  const width = (key: 'institution' | 'account' | 'accountId' | 'type' | 'balance') =>
+  const width = (key: 'institution' | 'account' | 'accountId' | 'type' | 'balance' | 'lastUpdated') =>
     Math.max(
       key === 'institution' ? 'Institution'.length : headers[key as keyof typeof headers].length,
       ...formatted.map(e => (e[key] ?? '').length),
@@ -97,6 +98,7 @@ export function printAccountsTable(
     accountId: showAccountId ? width('accountId') : 0,
     type: width('type'),
     balance: width('balance'),
+    lastUpdated: width('lastUpdated'),
   };
 
   const fmt = (e: typeof formatted[number]) => [
@@ -105,10 +107,12 @@ export function printAccountsTable(
     showAccountId ? (e.accountId ?? '').padEnd(w.accountId) : null,
     e.type.padEnd(w.type),
     e.balance.padStart(w.balance),
+    e.lastUpdated ?? '',
   ].filter(Boolean).join('  ');
 
   const header = fmt({
-    institution: 'Institution', account: 'Account', accountId: 'ID', type: 'Type', balance: 'Balance',
+    institution: 'Institution', account: 'Account', accountId: 'ID', type: 'Type',
+    balance: 'Balance', lastUpdated: 'Last Updated',
   });
   const divider = fmt({
     institution: '-'.repeat(w.institution),
@@ -116,6 +120,7 @@ export function printAccountsTable(
     accountId: '-'.repeat(w.accountId),
     type: '-'.repeat(w.type),
     balance: '-'.repeat(w.balance),
+    lastUpdated: '-'.repeat(w.lastUpdated),
   });
 
   console.log();

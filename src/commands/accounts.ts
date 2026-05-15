@@ -15,7 +15,7 @@ function accountLabels(
       type:        row.accountType ?? '—',
       category:    row.accountCategory ?? '—',
       balance:     row.accountCurrency && bal !== '—' ? `${row.accountCurrency} ${bal}` : bal,
-      updated:     row.latestDate ?? '—',
+      updated:     row.latestDate,
     };
   });
   const w = {
@@ -59,6 +59,7 @@ function printAccountSyncDiff(
       type:        a.type ?? '—',
       currency:    a.currency ?? undefined,
       balance:     a.balance != null ? formatCents(Math.round(a.balance * 100)) : '—',
+      lastUpdated: '—',
     })), { demo: opts.demo, showInstitution: false });
   }
   if (diff.updated.length > 0) {
@@ -94,6 +95,7 @@ export function printAccountSyncResult(
       type:        row.accountType ?? '—',
       currency:    row.accountCurrency ?? undefined,
       balance:     row.amountCents != null ? formatCents(row.amountCents) : '—',
+      lastUpdated: row.latestDate,
     })), { demo: opts.demo, showInstitution: false });
   }
 }
@@ -121,6 +123,7 @@ export function makeAccountsCommand(): Command {
           type:        row.accountType ?? '—',
           currency:    row.accountCurrency ?? undefined,
           balance:     row.amountCents != null ? formatCents(row.amountCents) : '—',
+          lastUpdated: row.latestDate,
         }));
         printAccountsTable(entries, { demo: opts.demo, showInstitution: true });
       } finally {

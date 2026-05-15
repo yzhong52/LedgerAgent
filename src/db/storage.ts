@@ -1,6 +1,6 @@
 
 import { createHash } from 'crypto';
-import { eq, desc, and, gte, inArray } from 'drizzle-orm';
+import { eq, desc, and, gte, inArray, sql } from 'drizzle-orm';
 import type { Account } from '../tasks/accounts';
 import { ACCOUNT_TYPES, ACCOUNT_CATEGORIES } from '../tasks/accounts';
 import type { Transaction } from '../tasks/transactions';
@@ -38,7 +38,7 @@ export interface AccountRow {
   accountCategory: string | null;
   accountCurrency: string | null;
   accountId: string;
-  latestDate: string | null;
+  latestDate: string;
   amountCents: number | null;
 }
 
@@ -52,7 +52,7 @@ export function listAccounts(db: Db): AccountRow[] {
       accountCategory: accountsTable.category,
       accountCurrency: accountsTable.currency,
       accountId:       accountsTable.accountId,
-      latestDate:      accountsTable.latestDate,
+      latestDate:      sql<string>`coalesce(${accountsTable.latestDate}, '—')`,
       amountCents:     accountsTable.latestAmountCents,
     })
     .from(accountsTable)

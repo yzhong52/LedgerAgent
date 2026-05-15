@@ -189,8 +189,8 @@ describe('getNetWorthHistory', () => {
     ({ sqlite, db } = makeDb());
     db.insert(schema.institutions).values({ id: 'td', name: 'TD', url: 'https://td.com' }).run();
     db.insert(schema.accounts).values([
-      { institutionId: 'td', accountId: 'chequing', name: 'Chequing', type: 'Chequing', currency: 'CAD' },
-      { institutionId: 'td', accountId: 'savings',  name: 'Savings',  type: 'Savings',  currency: 'CAD' },
+      { institutionId: 'td', accountId: 'chequing', name: 'Chequing', type: 'Chequing', currency: 'CAD', latestDate: '2026-05-15' },
+      { institutionId: 'td', accountId: 'savings',  name: 'Savings',  type: 'Savings',  currency: 'CAD', latestDate: '2026-05-15' },
     ]).run();
   });
   afterEach(() => { sqlite.close(); });
