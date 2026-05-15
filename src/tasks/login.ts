@@ -129,6 +129,7 @@ const TRACKED_TOOLS = new Set<string>([
 
 export async function login(
   page: Page, url: string, creds: Credentials, institutionName: string, sessionDir: string,
+  model: string,
 ): Promise<void> {
   const loginStartedAt = new Date();
   const notes = await loadMemoryNotes(institutionName, 'login');
@@ -222,6 +223,7 @@ export async function login(
       [creds.username, creds.password],
       MAX_TURNS,
       1024,
+      model,
     );
   } finally {
     if (events.length > 0) {

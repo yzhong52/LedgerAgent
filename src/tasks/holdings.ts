@@ -133,6 +133,7 @@ export async function exploreHoldings(
   institutionName: string,
   account: Pick<Account, 'name' | 'accountId'>,
   sessionDir: string,
+  model: string,
 ): Promise<Holding[]> {
   console.log(SEPARATOR);
   console.log(`🤖 Fetching holdings for ${account.name}... ⏳`);
@@ -185,6 +186,7 @@ export async function exploreHoldings(
       [],
       MAX_TURNS,
       1024,
+      model,
     );
   } finally {
     if (events.length > 0) {

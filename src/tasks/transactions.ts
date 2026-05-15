@@ -116,6 +116,7 @@ export async function fetchTransactions(
   account: Pick<Account, 'name' | 'accountId'>,
   lookbackDays: number,
   sessionDir: string,
+  model: string,
 ): Promise<Transaction[]> {
   console.log(SEPARATOR);
   console.log(`🤖 Fetching transactions for ${account.name}... ⏳`);
@@ -166,6 +167,7 @@ export async function fetchTransactions(
       [],
       MAX_TURNS,
       8192,
+      model,
     );
   } finally {
     if (events.length > 0) {
