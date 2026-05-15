@@ -46,11 +46,16 @@ const DEMO_HOLDINGS = [
   { symbol: 'SHOP', name: 'Shopify Inc.' },
 ];
 
-// Deterministically map a real symbol to a demo holding so it's stable across requests.
-function getDemoHolding(realSymbol: string): { symbol: string; name: string } {
-  let hash = 0;
-  for (let i = 0; i < realSymbol.length; i++) hash = (hash * 31 + realSymbol.charCodeAt(i)) & 0x7fffffff;
-  return DEMO_HOLDINGS[hash % DEMO_HOLDINGS.length];
+// Build a collision-free real→fake symbol map from all unique symbols in the dataset.
+// Sorts symbols for determinism, then assigns demo entries in order (cycling with a
+// numeric suffix if there are more real symbols than demo entries).
+function buildDemoSymbolMap(realSymbols: string[]): Map<string, { symbol: string; name: string }> {
+  const unique = [...new Set(realSymbols)].sort();
+  return new Map(unique.map((sym, i) => {
+    const base = DEMO_HOLDINGS[i % DEMO_HOLDINGS.length];
+    const cycle = Math.floor(i / DEMO_HOLDINGS.length);
+    return [sym, { symbol: cycle === 0 ? base.symbol : `${base.symbol}${cycle + 1}`, name: base.name }];
+  }));
 }
 
 function isDemoDebt(accountId: string, type: string | null): boolean {
@@ -211,8 +216,9 @@ app.get('/api/holdings', (c) => {
   try {
     let rows = listHoldings(db);
     if (demo) {
+      const symbolMap = buildDemoSymbolMap(rows.map(r => r.symbol));
       rows = rows.map(h => {
-        const fake = getDemoHolding(h.symbol);
+        const fake = symbolMap.get(h.symbol)!;
         const price = getDemoSymbolPrice(h.symbol);
         const mv = Math.round(price * Math.max(h.quantity, 1));
         return {
