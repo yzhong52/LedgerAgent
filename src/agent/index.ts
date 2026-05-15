@@ -9,7 +9,7 @@ export { SUCCESS_TOOL } from './tools';
 import { LOGS_DIR } from '../db';
 import { keychainLoadApiKey } from '../keychain';
 
-export const MODEL = 'claude-sonnet-4-6';
+export const MODEL = 'claude-haiku-4-5-20251001';
 export const MAX_TURNS = 20;
 export const SEPARATOR = '─'.repeat(60);
 
