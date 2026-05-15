@@ -128,6 +128,7 @@ export async function exploreAccounts(
   institutionName: string,
   sessionDir: string,
   existingAccounts: Pick<Account, 'name' | 'type' | 'currency' | 'accountId'>[] = [],
+  model: string,
 ): Promise<Account[]> {
   console.log(SEPARATOR);
   console.log('🤖 Exploring accounts... ⏳');
@@ -173,6 +174,7 @@ export async function exploreAccounts(
       [],
       MAX_TURNS,
       1024,
+      model,
     );
   } finally {
     if (events.length > 0) {

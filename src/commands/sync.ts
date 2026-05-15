@@ -22,6 +22,7 @@ export function makeSyncCommand(): Command {
     .option('--skip-transactions', 'Skip transaction fetch; only sync accounts')
     .option('-v, --verbose', 'Show accessibility snapshots in the terminal')
     .option('--demo', 'Hide sensitive data by randomizing balances and account numbers')
+    .option('--model <id>', 'Claude model ID to use (overrides the default)', 'claude-haiku-4-5-20251001')
     .action(async (opts: {
       institution?: string;
       days: string;
@@ -31,6 +32,7 @@ export function makeSyncCommand(): Command {
       skipTransactions: boolean;
       verbose: boolean;
       demo: boolean;
+      model: string;
     }) => {
       if (opts.accountId && !opts.institution) {
         console.log('--accountId requires --institution.');
@@ -67,7 +69,7 @@ export function makeSyncCommand(): Command {
 
           console.log(`\n🤖 Syncing ${inst.name}... ⏳`);
           const sessionDir = await createSession(inst.url);
-          await login(page, inst.url, { username: inst.username, password }, inst.name, sessionDir);
+          await login(page, inst.url, { username: inst.username, password }, inst.name, sessionDir, opts.model);
 
           if (!opts.skipAccounts) {
             // --- Accounts ---
@@ -85,7 +87,7 @@ export function makeSyncCommand(): Command {
                 };
               });
 
-            const accounts = await exploreAccounts(page, inst.name, sessionDir, existingAccounts);
+            const accounts = await exploreAccounts(page, inst.name, sessionDir, existingAccounts, opts.model);
             const diff = saveSync(db, inst.name, inst.url, accounts);
             const allSyncedAccounts = listAccounts(db).filter(a => a.institutionName === inst.name);
             printAccountSyncResult(inst.name, diff, allSyncedAccounts, { demo: opts.demo });
@@ -99,7 +101,7 @@ export function makeSyncCommand(): Command {
                   r => r.accountId === (account.accountId ?? account.name),
                 );
                 if (!row) continue;
-                const holdings = await exploreHoldings(page, inst.name, account, sessionDir);
+                const holdings = await exploreHoldings(page, inst.name, account, sessionDir, opts.model);
                 saveHoldings(db, row.id, holdings);
                 console.log(`  Holdings for ${account.name}:`);
                 printHoldingsTable(holdings);
@@ -141,7 +143,7 @@ export function makeSyncCommand(): Command {
                 const txs = await fetchTransactions(
                   page, inst.name,
                   { name: account.name, accountId: account.accountId },
-                  lookbackDays, sessionDir,
+                  lookbackDays, sessionDir, opts.model,
                 );
                 const newTxs = saveTransactions(db, inst.name, account.accountId, txs);
                 printTransactionSyncResult(account.name, newTxs, txs.length);

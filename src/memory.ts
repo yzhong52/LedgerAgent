@@ -2,7 +2,6 @@ import Anthropic from '@anthropic-ai/sdk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DATA_DIR } from './db';
-import { MODEL } from './agent';
 import { keychainLoadApiKey } from './keychain';
 
 export interface ToolEvent {
@@ -120,7 +119,7 @@ export async function generateSessionNotes(
 
   const client = new Anthropic({ apiKey: keychainLoadApiKey() ?? process.env.ANTHROPIC_API_KEY });
   const response = await client.messages.create({
-    model: MODEL,
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 512,
     messages: [{
       role: 'user',

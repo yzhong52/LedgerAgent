@@ -9,7 +9,6 @@ export { SUCCESS_TOOL } from './tools';
 import { LOGS_DIR } from '../db';
 import { keychainLoadApiKey } from '../keychain';
 
-export const MODEL = 'claude-haiku-4-5-20251001';
 export const MAX_TURNS = 20;
 export const SEPARATOR = '─'.repeat(60);
 
@@ -120,6 +119,7 @@ export async function runAgent<T>(
   sensitiveValues: string[] = [],
   maxTurns: number,
   maxTokens: number,
+  model: string,
 ): Promise<T> {
   let snapCount = 0;
   const redactSensitive = (text: string) => redact(text, sensitiveValues);
@@ -179,7 +179,7 @@ export async function runAgent<T>(
     await fs.appendFile(logFile, `\`\`\`json\n${redactSensitive(JSON.stringify([...pendingPrefix, pageStateMessage(snapFile)], null, 2))}\n\`\`\`\n\n`);
 
     const response = await getClient().messages.create({
-      model: MODEL,
+      model,
       max_tokens: maxTokens,
       system: systemPrompt,
       tools,
