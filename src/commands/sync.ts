@@ -7,7 +7,7 @@ import { createSession } from '../agent';
 import { keychainLoad } from '../keychain';
 import { openDb } from '../db';
 import { saveSync, saveHoldings, saveTransactions, listAccounts } from '../db/storage';
-import { prompt, readInstitutions, launchBrowser, printHoldingsTable } from './utils';
+import { prompt, readInstitutions, launchBrowser, printHoldingsTable, selectFromList, confirm } from './utils';
 import { printAccountSyncResult } from './accounts';
 import { printTransactionSyncResult } from './transactions';
 
@@ -15,6 +15,7 @@ export function makeSyncCommand(): Command {
   return new Command('sync')
     .description('Sync accounts and transactions for all institutions (login once per institution)')
     .option('-i, --institution <name>', 'Only sync this institution (case-insensitive)')
+    .option('--all', 'Sync all institutions non-interactively')
     .option('--days <n>', 'Number of days of transaction history to fetch (default: 30)', '30')
     .option('--accountId <id>', 'Only sync this account ID for transactions (requires --institution)')
     .option('--skip-accounts', 'Skip account discovery; only fetch transactions')
@@ -25,6 +26,7 @@ export function makeSyncCommand(): Command {
     .option('--model <id>', 'Claude model ID to use (overrides the default)', 'claude-haiku-4-5-20251001')
     .action(async (opts: {
       institution?: string;
+      all?: boolean;
       days: string;
       accountId?: string;
       skipAccounts: boolean;
@@ -43,17 +45,25 @@ export function makeSyncCommand(): Command {
       const lookbackDays = Math.max(1, parseInt(opts.days, 10) || 30);
 
       let institutions = await readInstitutions();
-      if (opts.institution) {
+      if (institutions.length === 0) {
+        console.log('No institutions saved. Run: npm run cli -- institution add');
+        return;
+      }
+
+      const interactive = !opts.all && !opts.institution && !opts.accountId;
+      if (interactive) {
+        const choices = ['All', ...institutions.map(i => i.name)];
+        const idx = await selectFromList(choices, 'Choose an institution to sync:');
+        if (idx > 0) institutions = [institutions[idx - 1]];
+        opts.skipTransactions = !(await confirm('Sync transactions?'));
+        opts.skipHoldings = !(await confirm('Sync holdings?'));
+      } else if (opts.institution) {
         const filter = opts.institution.toLowerCase();
         institutions = institutions.filter(i => i.name.toLowerCase() === filter);
         if (institutions.length === 0) {
           console.log(`No institution named "${opts.institution}". Run: npm run cli -- institution add`);
           return;
         }
-      }
-      if (institutions.length === 0) {
-        console.log('No institutions saved. Run: npm run cli -- institution add');
-        return;
       }
 
       const { db, close } = openDb();

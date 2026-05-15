@@ -127,9 +127,9 @@ describe('example console output', () => {
     expect(spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n')).toMatchInlineSnapshot(`
       "  + 1 new account(s) discovered:
 
-        Account  ID    Type         Balance
-        -------  ----  ----  --------------
-        RRSP     rrsp  RRSP  CAD $50,000.00
+        Account  ID    Type         Balance  Last Updated
+        -------  ----  ----  --------------  ------------
+        RRSP     rrsp  RRSP  CAD $50,000.00  —
 
         ~ 1 account(s) updated:
             Chequing: balance $1,000.00 → $1,500.00
@@ -140,11 +140,11 @@ describe('example console output', () => {
 
         Current accounts for TD:
 
-        Account   ID    Type             Balance
-        --------  ----  --------  --------------
-        Chequing  chq   Chequing   CAD $1,500.00
-        RRSP      rrsp  RRSP      CAD $50,000.00
-        Savings   sav   Savings    CAD $2,000.00
+        Account   ID    Type             Balance  Last Updated
+        --------  ----  --------  --------------  ------------
+        Chequing  chq   Chequing   CAD $1,500.00  2026-05-15
+        RRSP      rrsp  RRSP      CAD $50,000.00  2026-05-15
+        Savings   sav   Savings    CAD $2,000.00  2026-05-15
       "
     `);
   });
