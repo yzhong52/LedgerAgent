@@ -3,28 +3,46 @@ import { openDb } from '../db';
 import { listAccounts, mergeAccounts, type AccountRow, type AccountSyncDiff } from '../db/storage';
 import { prompt, printAccountsTable, formatCents, selectFromList } from './utils';
 
-function accountLabels(rows: AccountRow[], { showInstitution }: { showInstitution: boolean }): string[] {
+function accountLabels(
+  rows: AccountRow[],
+  { showInstitution }: { showInstitution: boolean },
+): { header: string; labels: string[] } {
   const items = rows.map(row => {
     const bal = row.amountCents != null ? formatCents(row.amountCents) : '—';
     return {
       institution: row.institutionName,
       name:        row.accountName,
       type:        row.accountType ?? '—',
+      category:    row.accountCategory ?? '—',
       balance:     row.accountCurrency && bal !== '—' ? `${row.accountCurrency} ${bal}` : bal,
+      updated:     row.latestDate ?? '—',
     };
   });
   const w = {
-    institution: showInstitution ? Math.max(...items.map(i => i.institution.length)) : 0,
-    name:        Math.max(...items.map(i => i.name.length)),
-    type:        Math.max(...items.map(i => i.type.length)),
-    balance:     Math.max(...items.map(i => i.balance.length)),
+    institution: showInstitution ? Math.max('Institution'.length, ...items.map(i => i.institution.length)) : 0,
+    name:        Math.max('Account'.length,     ...items.map(i => i.name.length)),
+    type:        Math.max('Type'.length,        ...items.map(i => i.type.length)),
+    category:    Math.max('Category'.length,    ...items.map(i => i.category.length)),
+    balance:     Math.max('Balance'.length,     ...items.map(i => i.balance.length)),
+    updated:     Math.max('Last Updated'.length,...items.map(i => i.updated.length)),
   };
-  return items.map(i => [
+  const header = [
+    showInstitution ? 'Institution'.padEnd(w.institution) : null,
+    'Account'.padEnd(w.name),
+    'Type'.padEnd(w.type),
+    'Category'.padEnd(w.category),
+    'Balance'.padStart(w.balance),
+    'Last Updated'.padEnd(w.updated),
+  ].filter(Boolean).join('  ');
+  const labels = items.map(i => [
     showInstitution ? i.institution.padEnd(w.institution) : null,
     i.name.padEnd(w.name),
     i.type.padEnd(w.type),
+    i.category.padEnd(w.category),
     i.balance.padStart(w.balance),
+    i.updated.padEnd(w.updated),
   ].filter(Boolean).join('  '));
+  return { header, labels };
 }
 
 function printAccountSyncDiff(
@@ -122,9 +140,12 @@ export function makeAccountsCommand(): Command {
           return;
         }
 
+        const { header: srcHeader, labels: srcLabels } = accountLabels(rows, { showInstitution: true });
         const srcIdx = await selectFromList(
-          accountLabels(rows, { showInstitution: true }),
-          'Source account to merge FROM (will be deleted):',
+          srcLabels,
+          'Choose an account to merge from (will be deleted):',
+          new Set(),
+          srcHeader,
         );
 
         const src = rows[srcIdx];
@@ -133,12 +154,24 @@ export function makeAccountsCommand(): Command {
           console.log(`  No other accounts found under ${src.institutionName}. Nothing to merge into.`);
           return;
         }
-        const tgtIdx = await selectFromList(
-          accountLabels(tgtRows, { showInstitution: true }),
-          'Target account to merge INTO:',
-        );
 
-        const tgt = tgtRows[tgtIdx];
+        // Insert source into the display list at its natural sorted position so the user
+        // can see it alongside candidates. It is dimmed and skipped during navigation.
+        const allRows = [...tgtRows, src].sort((a, b) => a.accountName.localeCompare(b.accountName));
+        const srcDisplayIdx = allRows.indexOf(src);
+        const { header: tgtHeader, labels: tgtLabels } = accountLabels(allRows, { showInstitution: false });
+        const displayLabels = tgtLabels.map(
+          (label, i) => i === srcDisplayIdx ? `${label}  ← merging from this` : label,
+        );
+        const skipIndices = new Set([srcDisplayIdx]);
+
+        const displayIdx = await selectFromList(
+          displayLabels,
+          `Choose an account from ${src.institutionName} to merge into:`,
+          skipIndices,
+          tgtHeader,
+        );
+        const tgt = allRows[displayIdx];
         console.log(`  Merge "${src.accountName}" (${src.institutionName})`);
         console.log(`    into "${tgt.accountName}" (${tgt.institutionName})?`);
         console.log(`  Balances, transactions, and holdings will be re-parented to the target.`);
