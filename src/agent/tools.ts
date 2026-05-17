@@ -21,8 +21,11 @@ export const BROWSER_TOOL = {
   CLICK_TESTID:    'click_testid',
   CLICK_TEXT:      'click_text',
   CLICK_JS:        'click_js',
+  CLICK_REF:       'click_ref',
   FILL_JS:         'fill_js',
+  FILL_REF:        'fill_ref',
   TYPE_JS:         'type_js',
+  TYPE_REF:        'type_ref',
   PRESS_ENTER:     'press_enter',
 } as const;
 
@@ -69,8 +72,11 @@ export const STATE_CHANGING_TOOLS = new Set<string>([
   BROWSER_TOOL.CLICK_TESTID,
   BROWSER_TOOL.CLICK_TEXT,
   BROWSER_TOOL.CLICK_JS,
+  BROWSER_TOOL.CLICK_REF,
   BROWSER_TOOL.FILL_JS,
+  BROWSER_TOOL.FILL_REF,
   BROWSER_TOOL.TYPE_JS,
+  BROWSER_TOOL.TYPE_REF,
   BROWSER_TOOL.PRESS_ENTER,
   LOGIN_TOOL.FILL,
   LOGIN_TOOL.TYPE,

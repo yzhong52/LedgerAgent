@@ -125,7 +125,7 @@ export async function runAgent<T>(
     let snap: string | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        snap = await page.locator('body').ariaSnapshot();
+        snap = await page.locator('body').ariaSnapshot({ mode: 'ai' });
         break;
       } catch {
         if (attempt < 2) await new Promise(r => setTimeout(r, 500));

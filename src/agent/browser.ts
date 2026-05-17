@@ -43,6 +43,17 @@ export const BROWSER_TOOLS: Tool[] = [
     },
   },
   {
+    name: BROWSER_TOOL.CLICK_REF,
+    description: 'Click an element by its ref ID from the aria snapshot (e.g. "e42"). Prefer this over click when the ref is available — it targets the exact element unambiguously.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string', description: 'The ref ID from the aria snapshot, e.g. "e42"' },
+      },
+      required: ['ref'],
+    },
+  },
+  {
     name: BROWSER_TOOL.CLICK_JS,
     description: 'Click an element using a CSS selector. Use as a last resort when click fails. Pass frame when the element is inside an iframe.',
     input_schema: {
@@ -76,6 +87,18 @@ export const BROWSER_TOOLS: Tool[] = [
     },
   },
   {
+    name: BROWSER_TOOL.FILL_REF,
+    description: 'Fill a form field by its ref ID from the aria snapshot. Prefer this over fill_js when the ref is available.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ref:   { type: 'string', description: 'The ref ID from the aria snapshot, e.g. "e42"' },
+        value: { type: 'string', description: 'Value to fill' },
+      },
+      required: ['ref', 'value'],
+    },
+  },
+  {
     name: BROWSER_TOOL.FILL_JS,
     description: 'Fill a form field by CSS selector. Use after get_inputs to fill fields that have no accessible name. Pass frame when the input is inside an iframe.',
     input_schema: {
@@ -86,6 +109,18 @@ export const BROWSER_TOOLS: Tool[] = [
         frame:    { type: 'string', description: 'CSS selector for the containing iframe, if any' },
       },
       required: ['selector', 'value'],
+    },
+  },
+  {
+    name: BROWSER_TOOL.TYPE_REF,
+    description: 'Clear a field by ref ID then type character-by-character. Use for OTP or masked inputs that require keystroke events. Prefer this over type_js when the ref is available.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ref:   { type: 'string', description: 'The ref ID from the aria snapshot, e.g. "e42"' },
+        value: { type: 'string', description: 'Value to type' },
+      },
+      required: ['ref', 'value'],
     },
   },
   {
@@ -160,6 +195,12 @@ export async function executeBrowserTool(
       return `clicked text "${input.text}"`;
     }
 
+    case BROWSER_TOOL.CLICK_REF: {
+      await page.locator(`aria-ref=${input.ref}`).click({ timeout: 5000 });
+      await afterClick(page);
+      return `clicked ref=${input.ref}`;
+    }
+
     case BROWSER_TOOL.CLICK_JS: {
       const jsTarget = input.frame
         ? page.frameLocator(input.frame as string).locator(input.selector as string)
@@ -170,7 +211,7 @@ export async function executeBrowserTool(
     }
 
     case BROWSER_TOOL.FRAME_SNAPSHOT:
-      return page.frameLocator(input.frame as string).locator('body').ariaSnapshot();
+      return page.frameLocator(input.frame as string).locator('body').ariaSnapshot({ mode: 'ai' });
 
     case BROWSER_TOOL.GET_INPUTS: {
       const locator = input.frame
@@ -187,12 +228,26 @@ export async function executeBrowserTool(
       ).join('\n');
     }
 
+    case BROWSER_TOOL.FILL_REF: {
+      await page.locator(`aria-ref=${input.ref}`).fill(input.value as string, { timeout: 5000 });
+      return `filled ref=${input.ref}`;
+    }
+
     case BROWSER_TOOL.FILL_JS: {
       const target = input.frame
         ? page.frameLocator(input.frame as string).locator(input.selector as string)
         : page.locator(input.selector as string);
       await target.fill(input.value as string, { timeout: 5000 });
       return `filled "${input.selector}"${input.frame ? ` in ${input.frame}` : ''}`;
+    }
+
+    case BROWSER_TOOL.TYPE_REF: {
+      const typeRefLocator = page.locator(`aria-ref=${input.ref}`);
+      await typeRefLocator.click({ timeout: 5000 });
+      await typeRefLocator.press('Control+A');
+      await typeRefLocator.press('Delete');
+      await typeRefLocator.pressSequentially(input.value as string, { timeout: 5000 });
+      return `typed into ref=${input.ref}`;
     }
 
     case BROWSER_TOOL.TYPE_JS: {
