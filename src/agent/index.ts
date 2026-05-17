@@ -1,4 +1,9 @@
-import type { ContentBlockParam, MessageParam, Tool } from '@anthropic-ai/sdk/resources/messages';
+import type {
+  ContentBlockParam,
+  MessageParam,
+  Tool,
+  ToolResultBlockParam,
+} from '@anthropic-ai/sdk/resources/messages';
 import type { Page } from 'playwright';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -111,13 +116,13 @@ export async function runAgent<T>(
     return { snap, snapFile };
   }
 
-  // messages holds compressed history. pendingPrefix is the non-snapshot content for the next
-  // user turn (initial message block, or tool results). At the top of each turn a snapshot is
-  // taken and appended to form the live userContent sent to the API; the archived message gets
-  // the agent's page summary instead of the full snapshot.
+  // messages holds compressed history. pendingUserContent is the non-snapshot content for the
+  // next user turn: the initial message on turn 0, then tool results on later turns. Each loop
+  // appends the fresh snapshot before sending it to the API; archived user turns get the agent's
+  // page summary instead of the full snapshot.
   const messages: MessageParam[] = [];
   const initialBlock = { type: 'text' as const, text: initialMessage };
-  let pendingPrefix: ContentBlockParam[] = [initialBlock];
+  let pendingUserContent: ContentBlockParam[] = [initialBlock];
 
   const logFile = `${sessionDir}/${logName}.md`;
   await fs.writeFile(
@@ -125,12 +130,16 @@ export async function runAgent<T>(
     `# ${path.basename(sessionDir)} — ${logName}\n\n` +
       `## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`,
   );
+  const systemPromptWithPageSummary = systemPrompt +
+    '\n\nBefore each tool call, start your response with one sentence ' +
+    'summarizing the current page: what section is shown and what accounts or financial data ' +
+    'are visible. This helps you track which pages you have already visited.';
 
   for (let turn = 0; turn < maxTurns; turn++) {
     const { snap, snapFile } = await takeSnapshot();
     // API receives the full snapshot content; the log records the file path instead
     // so conversation logs stay readable without the full ARIA tree on every turn.
-    const userContent = [...pendingPrefix, pageStateMessage(snap)];
+    const userContent = [...pendingUserContent, pageStateMessage(snap)];
 
     if (turn > 0) await fs.appendFile(logFile, '---\n\n');
     await fs.appendFile(logFile, `## Turn ${turn}\n\n`);
@@ -138,16 +147,14 @@ export async function runAgent<T>(
     await fs.appendFile(
       logFile,
       `\`\`\`json\n` +
-        `${redactSensitive(JSON.stringify([...pendingPrefix, pageStateMessage(snapFile)], null, 2))}` +
+        `${redactSensitive(JSON.stringify([...pendingUserContent, pageStateMessage(snapFile)], null, 2))}` +
         `\n\`\`\`\n\n`,
     );
 
     const response = await callWithTools({
       model,
       maxTokens,
-      system: systemPrompt + '\n\nBefore each tool call, start your response with one sentence ' +
-        'summarizing the current page: what section is shown and what accounts or financial data ' +
-        'are visible. This helps you track which pages you have already visited.',
+      system: systemPromptWithPageSummary,
       tools,
       messages,
       userContent,
@@ -162,7 +169,7 @@ export async function runAgent<T>(
     // Archive the agent's own page summary in place of the full snapshot.
     messages.push({
       role: 'user',
-      content: [...pendingPrefix, archiveSnapshot(response.responseText, snap)],
+      content: [...pendingUserContent, archiveSnapshot(response.responseText, snap)],
     });
     messages.push({
       role: 'assistant',
@@ -172,7 +179,7 @@ export async function runAgent<T>(
     const toolUses = response.toolUses;
     if (toolUses.length === 0) throw new Error('unexpected: model returned no tool calls');
 
-    const toolResults: { type: 'tool_result'; tool_use_id: string; content: string }[] = [];
+    const toolResults: ToolResultBlockParam[] = [];
     let result: { value: T } | undefined;
 
     for (const toolUse of toolUses) {
@@ -218,9 +225,9 @@ export async function runAgent<T>(
     }
 
     if (!result) {
-      // Store tool results as the prefix for the next turn; the snapshot is taken
+      // Store tool results as the non-snapshot content for the next turn; the snapshot is taken
       // at the top of that turn so it captures the final post-tool page state.
-      pendingPrefix = toolResults;
+      pendingUserContent = toolResults;
     } else {
       return result.value;
     }
