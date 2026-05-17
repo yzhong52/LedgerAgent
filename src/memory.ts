@@ -116,10 +116,12 @@ export async function generateSessionNotes(
     .map(e => `- ${e.description}: ${e.outcome === 'error' ? `FAILED (${e.error})` : 'ok'}`)
     .join('\n');
 
-  const text = await callForText(
+  const text = await callForText({
     model,
-    `You are reviewing a browser automation session for ${taskContext}. Here is the sequence of actions taken:\n\n${transcript}\n\nWrite 3-5 concise bullet points capturing:\n- Which selectors or tools worked well and should be tried first next time\n- Which failed and what succeeded instead\n- Any unusual flows or page structures encountered\n\nBe specific about element names and tools used. These notes will be injected into the next session's system prompt.\n\nDo not include a heading or title — start directly with the bullet points.`,
-  );
+    system: '',
+    maxTokens: 512,
+    userMessage: `You are reviewing a browser automation session for ${taskContext}. Here is the sequence of actions taken:\n\n${transcript}\n\nWrite 3-5 concise bullet points capturing:\n- Which selectors or tools worked well and should be tried first next time\n- Which failed and what succeeded instead\n- Any unusual flows or page structures encountered\n\nBe specific about element names and tools used. These notes will be injected into the next session's system prompt.\n\nDo not include a heading or title — start directly with the bullet points.`,
+  });
 
   return normalizeNotes(text);
 }

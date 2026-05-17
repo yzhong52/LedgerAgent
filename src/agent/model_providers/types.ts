@@ -1,5 +1,12 @@
 import type { ContentBlockParam, MessageParam, TextBlock, Tool, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
 
+export interface TextCallParams {
+  model: string;
+  system: string;
+  userMessage: string;
+  maxTokens: number;
+}
+
 export interface ProviderResponse {
   toolUses: Array<{ id: string; name: string; input: Record<string, unknown> }>;
   // Anthropic-format content blocks — used to append the assistant turn to message history.

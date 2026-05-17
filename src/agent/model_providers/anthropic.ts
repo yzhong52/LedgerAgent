@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { TextBlock, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
 import { keychainLoadApiKey } from '../../keychain';
-import type { ProviderCallParams, ProviderResponse } from './types';
+import type { ProviderCallParams, ProviderResponse, TextCallParams } from './types';
 
 let _client: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -40,11 +40,12 @@ export async function callAnthropic(params: ProviderCallParams): Promise<Provide
   };
 }
 
-export async function callAnthropicForText(model: string, userMessage: string): Promise<string> {
+export async function callAnthropicForText(params: TextCallParams): Promise<string> {
   const response = await getClient().messages.create({
-    model,
-    max_tokens: 512,
-    messages: [{ role: 'user', content: userMessage }],
+    model: params.model,
+    max_tokens: params.maxTokens,
+    ...(params.system ? { system: params.system } : {}),
+    messages: [{ role: 'user', content: params.userMessage }],
   });
   const block = response.content.find(b => b.type === 'text');
   return block?.type === 'text' ? block.text : '';

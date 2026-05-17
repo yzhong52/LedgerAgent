@@ -4,7 +4,7 @@ import type {
   ChatCompletionMessageFunctionToolCall,
 } from 'openai/resources/chat/completions';
 import type { ContentBlockParam, MessageParam, Tool, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
-import type { ProviderCallParams, ProviderResponse } from './types';
+import type { ProviderCallParams, ProviderResponse, TextCallParams } from './types';
 
 let _client: OpenAI | null = null;
 function getClient(): OpenAI {
@@ -260,11 +260,14 @@ export async function callOllama(params: ProviderCallParams): Promise<ProviderRe
   return { toolUses, assistantContent, rawForLog: response, responseText: (message?.content ?? '').trim() };
 }
 
-export async function callOllamaForText(model: string, userMessage: string): Promise<string> {
+export async function callOllamaForText(params: TextCallParams): Promise<string> {
   const response = await getClient().chat.completions.create({
-    model,
-    max_tokens: 512,
-    messages: [{ role: 'user', content: userMessage }],
+    model: params.model,
+    max_tokens: params.maxTokens,
+    messages: [
+      ...(params.system ? [{ role: 'system' as const, content: params.system }] : []),
+      { role: 'user' as const, content: params.userMessage },
+    ],
   });
   return response.choices[0]?.message.content ?? '';
 }

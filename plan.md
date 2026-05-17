@@ -12,15 +12,6 @@ TFSA account balance?" — which is what causes the loops.
 
 ## Proposed Solution
 
-Go with the two-call approach:
-- Summarization and action are cleanly separated — the summarizer has no agenda other than
-  accuracy; the action model has no noisy history to reason through
-- Each call receives only what it needs: the summarizer gets the previous summary + snapshot; the
-  action model gets only the current summary
-- The summarization step can use a cheaper/faster model (e.g. Haiku) to offset the extra call cost
-- Simpler to prompt correctly: each prompt has a single, narrow responsibility
-
-
 ## Implementation Sketch
 
 Each turn in `runAgent` becomes two sequential LLM calls:

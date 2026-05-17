@@ -1,8 +1,8 @@
-export type { ProviderCallParams, ProviderResponse } from './types';
+export type { ProviderCallParams, ProviderResponse, TextCallParams } from './types';
 
 import { callAnthropic, callAnthropicForText } from './anthropic';
 import { callOllama, callOllamaForText } from './ollama';
-import type { ProviderCallParams, ProviderResponse } from './types';
+import type { ProviderCallParams, ProviderResponse, TextCallParams } from './types';
 
 export function isAnthropicModel(model: string): boolean {
   return model.startsWith('claude-');
@@ -16,7 +16,7 @@ export async function callWithTools(params: ProviderCallParams): Promise<Provide
   return callOllama(params);
 }
 
-export async function callForText(model: string, userMessage: string): Promise<string> {
-  if (isAnthropicModel(model)) return callAnthropicForText(model, userMessage);
-  return callOllamaForText(model, userMessage);
+export async function callForText(params: TextCallParams): Promise<string> {
+  if (isAnthropicModel(params.model)) return callAnthropicForText(params);
+  return callOllamaForText(params);
 }

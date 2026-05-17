@@ -1,6 +1,4 @@
 import type {
-  ContentBlockParam,
-  MessageParam,
   Tool,
   ToolResultBlockParam,
 } from '@anthropic-ai/sdk/resources/messages';
@@ -8,7 +6,7 @@ import type { Page } from 'playwright';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { redact } from './redact';
-import { callWithTools } from './model_providers';
+import { callWithTools, callForText } from './model_providers';
 import {
   logSnapshot,
   logToolError,
@@ -43,39 +41,24 @@ function isDone<T>(r: ToolContinue | ToolDone<T>): r is ToolDone<T> {
   return r.done;
 }
 
-// Archives the previous page snapshot as a brief summary written by the agent
-// itself. The agent is instructed (via the system prompt augmentation below) to
-// open each response with a one-sentence page summary before its tool calls;
-// that text is captured here so the agent can recall which pages it has visited
-// and what data it saw, preventing navigation flip-flopping.
-// Falls back to a raw truncation when the model produced no text.
-function archiveSnapshot(responseText: string, snap: string): { type: 'text'; text: string } {
-  if (responseText) return { type: 'text', text: `[prev page summary]\n${responseText}` };
-  const stripped = snap.replace(/\s*\[ref=\w+\]/g, '');
-  const preview = stripped.length > 800 ? stripped.slice(0, 800) + '\n…' : stripped;
-  return { type: 'text', text: `[prev page state]\n${preview}` };
-}
-
-function pageStateMessage(snap: string): { type: 'text'; text: string } {
-  return { type: 'text', text: `Current page state:\n${snap}` };
-}
+// Prompt for Call 1 each turn: synthesize previous state + tool results + current snapshot
+// into a structured JSON summary. The act model (Call 2) receives only this summary.
+const SUMMARIZE_SYSTEM =
+  'You are tracking the state of a browser automation session. ' +
+  'Given what was known before, the results of recent actions, and the current page snapshot, ' +
+  'produce a concise JSON summary of: pages visited, data collected so far (with specific names ' +
+  'and values), and what still needs to be found. ' +
+  'Output only the JSON object — no explanation, no markdown code fences.';
 
 // T is the task's return type — e.g. Account[] for exploreAccounts, void for login.
 //
-// systemPrompt: persistent instructions passed via the `system` API parameter, visible on every
-//   turn but outside the conversation history. Holds task description and memory notes.
-//   Example: "You are a browser agent. Use fill_credential to fill in credentials. Call success()
-//   once the dashboard is visible."
+// systemPrompt: task instructions for the act model — what to find and which tools to use.
 //
-// initialMessage: the first user-role message that starts the conversation, combined internally
-//   with the initial ARIA snapshot of the page.
-//   Example: "The browser has navigated to the login page."
+// initialMessage: context for the first turn's summarizer (e.g. "User is now logged in.").
 //
-// onTool: called for each tool use Claude returns. Return a plain string to feed the result back
-//   to Claude, or toolDone(value) to signal completion and carry the final value out of the loop.
+// onTool: called for each tool use. Return toolResult(str) to continue or toolDone(value) to end.
 //
-// sensitiveValues: exact strings to redact from snapshots, tool results, and logs before they
-//   are sent back to the model or written to disk.
+// summaryModel: optional cheaper model for the summarize call; defaults to model.
 export async function runAgent<T>(
   page: Page,
   tools: Tool[],
@@ -92,6 +75,7 @@ export async function runAgent<T>(
   maxTurns: number,
   maxTokens: number,
   model: string,
+  summaryModel?: string,
 ): Promise<T> {
   let snapCount = 0;
   const redactSensitive = (text: string) => redact(text, sensitiveValues);
@@ -124,121 +108,103 @@ export async function runAgent<T>(
     return { snap, snapFile };
   }
 
-  // messages holds compressed history. pendingUserContent is the non-snapshot content for the
-  // next user turn: the initial message on turn 0, then tool results on later turns. Each loop
-  // appends the fresh snapshot before sending it to the API; archived user turns get the agent's
-  // page summary instead of the full snapshot.
-  const messages: MessageParam[] = [];
-  const initialBlock = { type: 'text' as const, text: initialMessage };
-  let pendingUserContent: ContentBlockParam[] = [initialBlock];
-
   const logFile = `${sessionDir}/conversation_${taskName}.md`;
   await fs.writeFile(
     logFile,
     `# ${path.basename(sessionDir)} — ${taskName}\n\n` +
       `## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`,
   );
-  const systemPromptWithPageSummary = systemPrompt +
-    '\n\nBefore each tool call, start your response with one sentence ' +
-    'summarizing the current page: what section is shown and what accounts or financial data ' +
-    'are visible. This helps you track which pages you have already visited.';
+
+  // currentSummary carries the JSON state produced by Call 1 into Call 2 and the next turn.
+  // lastToolResults carries the outcomes of Call 2's tool executions into the next turn's Call 1.
+  let currentSummary = '';
+  let lastToolResults: string[] = [];
 
   for (let turn = 0; turn < maxTurns; turn++) {
     const { snap, snapFile } = await takeSnapshot();
-    // API receives the full snapshot content; the log records the file path instead
-    // so conversation logs stay readable without the full ARIA tree on every turn.
-    const userContent = [...pendingUserContent, pageStateMessage(snap)];
 
     if (turn > 0) await fs.appendFile(logFile, '---\n\n');
     await fs.appendFile(logFile, `## Turn ${turn}\n\n`);
-    await fs.appendFile(logFile, `### User → Agent\n\n`);
-    await fs.appendFile(
-      logFile,
-      `\`\`\`json\n` +
-        `${redactSensitive(JSON.stringify([...pendingUserContent, pageStateMessage(snapFile)], null, 2))}` +
-        `\n\`\`\`\n\n`,
-    );
+
+    // ── Call 1: Summarize ──────────────────────────────────────────────────────
+    const summarizeParts: string[] = [];
+    if (currentSummary) {
+      summarizeParts.push(`Previous state:\n${currentSummary}`);
+    } else {
+      summarizeParts.push(`Session context: ${initialMessage}`);
+    }
+    if (lastToolResults.length > 0) {
+      summarizeParts.push(`Last actions and results:\n${lastToolResults.join('\n')}`);
+    }
+    summarizeParts.push(`Current page (${snapFile}):\n${snap}`);
+    const summarizeUserMsg = summarizeParts.join('\n\n');
+
+    await fs.appendFile(logFile, `### Turn ${turn} — Summarize\n\n`);
+    await fs.appendFile(logFile, `#### Input\n\n\`\`\`\n${redactSensitive(summarizeUserMsg)}\n\`\`\`\n\n`);
+
+    currentSummary = redactSensitive(await callForText({
+      model: summaryModel ?? model,
+      system: SUMMARIZE_SYSTEM,
+      userMessage: summarizeUserMsg,
+      maxTokens: 1024,
+    }));
+
+    await fs.appendFile(logFile, `#### Output\n\n\`\`\`json\n${currentSummary}\n\`\`\`\n\n`);
+
+    // ── Call 2: Act ────────────────────────────────────────────────────────────
+    await fs.appendFile(logFile, `### Turn ${turn} — Act\n\n`);
+    await fs.appendFile(logFile, `#### Input\n\n\`\`\`json\n${currentSummary}\n\`\`\`\n\n`);
 
     const response = await callWithTools({
       model,
       maxTokens,
-      system: systemPromptWithPageSummary,
+      system: systemPrompt,
       tools,
-      messages,
-      userContent,
+      messages: [],
+      userContent: [{ type: 'text', text: `Current state:\n${currentSummary}` }],
     });
 
-    await fs.appendFile(logFile, `### Agent → User\n\n`);
     await fs.appendFile(
       logFile,
-      `\`\`\`json\n${redactSensitive(JSON.stringify(response.rawForLog, null, 2))}\n\`\`\`\n\n`,
+      `#### Response\n\n\`\`\`json\n${redactSensitive(JSON.stringify(response.rawForLog, null, 2))}\n\`\`\`\n\n`,
     );
-
-    // Archive the agent's own page summary in place of the full snapshot.
-    messages.push({
-      role: 'user',
-      content: [...pendingUserContent, archiveSnapshot(response.responseText, snap)],
-    });
-    messages.push({
-      role: 'assistant',
-      content: response.assistantContent as MessageParam['content'],
-    });
 
     const toolUses = response.toolUses;
     if (toolUses.length === 0) throw new Error('unexpected: model returned no tool calls');
 
     const toolResults: ToolResultBlockParam[] = [];
+    lastToolResults = [];
     let completion: { value: T } | undefined;
 
     for (const toolUse of toolUses) {
       if (!completion) {
-        logToolUse(
-          turn,
-          maxTurns,
-          toolUse.name,
-          toolUse.input as Record<string, unknown>,
-          redactSensitive,
-        );
+        logToolUse(turn, maxTurns, toolUse.name, toolUse.input as Record<string, unknown>, redactSensitive);
 
         let output = '';
         try {
           const r = await onTool(toolUse.name, toolUse.input as Record<string, unknown>, page);
           if (isDone(r)) {
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: toolUse.id,
-              content: redactSensitive(r.content),
-            });
+            output = redactSensitive(r.content);
+            toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
             completion = { value: r.value };
           } else {
             output = redactSensitive(r.content);
             logToolResult(toolUse.name, output);
             toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
           }
+          lastToolResults.push(`${toolUse.name}: ${output}`);
         } catch (err) {
-          // TODO: break retry loops — the model sometimes retries the same failing call
-          // repeatedly even when the error is unrecoverable. Appending a "do not retry"
-          // hint to the tool result was tried (tracking seen calls by toolName+input) but
-          // didn't reliably stop the loop in practice because the model still found reasons
-          // to retry given the full conversation history. Needs a better approach.
           output = redactSensitive(`error: ${err instanceof Error ? err.message : String(err)}`);
           logToolError(err, output);
           toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
+          lastToolResults.push(`${toolUse.name}: ${output}`);
         }
       } else {
-        // The API requires a tool_result for every tool_use in the conversation history,
-        // even for tool calls that came after the terminal tool in the same response.
         toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: 'skipped' });
       }
     }
 
-    if (!completion) {
-      // Store tool results as the non-snapshot content for the next turn; the snapshot is taken
-      // at the top of that turn so it captures the final post-tool page state.
-      pendingUserContent = toolResults;
-    } else {
-      return completion.value;
-    }
+    if (completion) return completion.value;
   }
 
   throw new Error(`agent did not complete within ${maxTurns} turns`);
