@@ -5,7 +5,7 @@ import {
   type ToolContinue, type ToolDone,
 } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
-import { ACCOUNT_TOOL, DONE_TOOL, DONE_TOOL_DEF } from '../agent/tools';
+import { ACCOUNT_TOOL } from '../agent/tools';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
   generateSessionNotes, type ToolEvent,
@@ -58,12 +58,7 @@ const REPORT_ACCOUNTS = ACCOUNT_TOOL.REPORT_ACCOUNTS;
 
 const REPORT_TOOL: Tool = {
   name: REPORT_ACCOUNTS,
-  description: [
-    'Report accounts visible in the current view.',
-    'Call this each time you find a new set of accounts (e.g. after landing on a tab or section).',
-    'You can call it multiple times — results accumulate.',
-    'When you have navigated all sections and reported all accounts, call done.',
-  ].join(' '),
+  description: 'Report all accounts found. Navigate all tabs and sections first, then call this once with the complete list to finish.',
   input_schema: {
     type: 'object',
     properties: {
@@ -109,7 +104,7 @@ const REPORT_TOOL: Tool = {
   },
 };
 
-const TOOLS = [...BROWSER_TOOLS, REPORT_TOOL, DONE_TOOL_DEF];
+const TOOLS = [...BROWSER_TOOLS, REPORT_TOOL];
 
 // Tools whose outcomes are recorded as ToolEvents and later summarized into
 // per-institution memory. Include any tool where success/failure is worth
@@ -127,7 +122,6 @@ type TrackToolEvent = (
 ) => void;
 
 interface AccountToolContext {
-  collectedAccounts: Account[];
   track: TrackToolEvent;
 }
 
@@ -172,9 +166,8 @@ Your job is to find all accounts — including their names, types, categories, c
 Steps:
 1. The current page state is already provided — identify all account entries visible now.
 2. Accounts typically appear as a list with a label and a dollar amount.
-3. Call report_accounts with the accounts visible in the current view.
-4. If more accounts are behind a tab or link (e.g. "All accounts", "Holdings"), click it and call report_accounts again for that section.
-5. Repeat until all sections are explored, then call done.
+3. If more accounts are behind a tab or link (e.g. "All accounts", "Holdings"), click through all sections first.
+4. Once you have explored all sections, call report_accounts once with the complete list of all accounts found.
 
 For investment accounts, report the 'Total equity' if available instead of 'Market value' or 'Cash' or 'Buying power'.
 
@@ -184,21 +177,15 @@ ${formatMemoryForPrompt(notes, 'accounts')}`;
 }
 
 async function handleAccountToolCall(
-  { collectedAccounts, track }: AccountToolContext,
+  { track }: AccountToolContext,
   name: string,
   input: Record<string, unknown>,
   pg: Page,
 ): Promise<ToolContinue | ToolDone<Account[]>> {
   if (name === REPORT_ACCOUNTS) {
-    const batch = (input as { accounts: Account[] }).accounts;
-    collectedAccounts.push(...batch);
+    const accounts = (input as { accounts: Account[] }).accounts;
     track('report_accounts', 'success');
-    return toolResult(`${batch.length} accounts recorded (${collectedAccounts.length} total so far). Navigate to the next section or call done_accounts if finished.`);
-  }
-
-  if (name === DONE_TOOL) {
-    track('done', 'success');
-    return toolDone<Account[]>(collectedAccounts, `done — ${collectedAccounts.length} accounts collected`);
+    return toolDone<Account[]>(accounts, `done — ${accounts.length} accounts collected`);
   }
 
   if (TRACKED_TOOLS.has(name)) {
@@ -235,10 +222,8 @@ export async function exploreAccounts(
   const track = (description: string, outcome: 'success' | 'error', error?: string) =>
     events.push({ description, outcome, error });
 
-  const collectedAccounts: Account[] = [];
-
   try {
-    const handleToolCall = handleAccountToolCall.bind(null, { collectedAccounts, track });
+    const handleToolCall = handleAccountToolCall.bind(null, { track });
 
     return await runAgent<Account[]>(
       page,
