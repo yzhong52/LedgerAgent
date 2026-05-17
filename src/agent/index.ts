@@ -55,8 +55,8 @@ async function summarizePage(
     `Task context:\n${systemPrompt}`,
     prevContext ? `Previously seen:\n${prevContext}` : null,
     `Current page:\n${snap}`,
-    'Summarize the financial data visible on the current page (accounts, balances, transactions, ' +
-      'navigation, etc.). Build on the previously seen context so the result is a full accumulated ' +
+    'Summarize the data visible on the current page for the task.' +
+      'Build on the previously seen context so the result is a full accumulated ' +
       'picture of what has been observed so far.',
   ].filter(Boolean).join('\n\n');
   return callForText(model, prompt);

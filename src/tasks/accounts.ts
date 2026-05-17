@@ -1,6 +1,9 @@
 import type { Page } from 'playwright';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages';
-import { runAgent, toolDone, toolResult, MAX_TURNS, SEPARATOR } from '../agent';
+import {
+  runAgent, toolDone, toolResult, MAX_TURNS, SEPARATOR,
+  type ToolContinue, type ToolDone,
+} from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
 import { ACCOUNT_TOOL, DONE_TOOL, DONE_TOOL_DEF } from '../agent/tools';
 import {
@@ -117,22 +120,49 @@ const TRACKED_TOOLS = new Set<string>([
   BROWSER_TOOL.FRAME_SNAPSHOT, BROWSER_TOOL.GET_INPUTS,
 ]);
 
+type TrackToolEvent = (
+  description: string,
+  outcome: 'success' | 'error',
+  error?: string,
+) => void;
+
+interface AccountToolContext {
+  collectedAccounts: Account[];
+  track: TrackToolEvent;
+}
+
 export interface ExistingAccountHint {
   dbId: number;
   name: string;
   institutionAccountId?: string;
 }
 
-function buildSystemPrompt(notes: string, existingAccounts: ExistingAccountHint[]): string {
-  let existingAccountsMsg = '';
-  if (existingAccounts && existingAccounts.length > 0) {
-    existingAccountsMsg = `\nPreviously seen accounts for this institution:\n` +
-      existingAccounts.map(a => {
-        const instId = a.institutionAccountId ? `, Institution ID: ${a.institutionAccountId}` : '';
-        return `- "${a.name}" (DB ID: ${a.dbId}${instId})`;
-      }).join('\n') +
-      `\n\nIMPORTANT: If you see an account that matches one of the above, please report it using the exact same name and Institution ID from this list to prevent duplicates. If it has a new ID or doesn't match, treat it as a new account.\n`;
+function formatExistingAccountsHint(existingAccounts: ExistingAccountHint[]): string {
+  if (existingAccounts.length === 0) {
+    return '';
   }
+
+  const accountList = existingAccounts
+    .map(({ dbId, name, institutionAccountId }) => {
+      const institutionId = institutionAccountId
+        ? `, Institution ID: ${institutionAccountId}`
+        : '';
+
+      return `- "${name}" (DB ID: ${dbId}${institutionId})`;
+    })
+    .join('\n');
+
+  return `
+Previously seen accounts for this institution:
+${accountList}
+
+IMPORTANT: If you see an account that matches one of the above, please report it using the exact same name and Institution ID from this list to prevent duplicates.
+If it has a new ID or doesn't match, treat it as a new account.
+`;
+}
+
+function buildSystemPrompt(notes: string, existingAccounts: ExistingAccountHint[]): string {
+  const existingAccountsHint = formatExistingAccountsHint(existingAccounts);
 
   return `\
 You are a browser automation agent. The user has just logged into their financial institution and the dashboard is visible.
@@ -145,9 +175,48 @@ Steps:
 3. Call report_accounts with the accounts visible in the current view.
 4. If more accounts are behind a tab or link (e.g. "All accounts", "Holdings"), click it and call report_accounts again for that section.
 5. Repeat until all sections are explored, then call done.
-${existingAccountsMsg}
+
+For investment accounts, report the 'Total equity' if available instead of 'Market value' or 'Cash' or 'Buying power'.
+
+${existingAccountsHint}
 Do not navigate away from the dashboard. Do not click login/logout links.
 ${formatMemoryForPrompt(notes, 'accounts')}`;
+}
+
+async function handleAccountToolCall(
+  { collectedAccounts, track }: AccountToolContext,
+  name: string,
+  input: Record<string, unknown>,
+  pg: Page,
+): Promise<ToolContinue | ToolDone<Account[]>> {
+  if (name === REPORT_ACCOUNTS) {
+    const batch = (input as { accounts: Account[] }).accounts;
+    collectedAccounts.push(...batch);
+    track('report_accounts', 'success');
+    return toolResult(`${batch.length} accounts recorded (${collectedAccounts.length} total so far). Navigate to the next section or call done_accounts if finished.`);
+  }
+
+  if (name === DONE_TOOL) {
+    track('done', 'success');
+    return toolDone<Account[]>(collectedAccounts, `done — ${collectedAccounts.length} accounts collected`);
+  }
+
+  if (TRACKED_TOOLS.has(name)) {
+    const desc = input.role
+      ? `${name}(${input.role} "${input.name}")`
+      : `${name}(${JSON.stringify(input)})`;
+    try {
+      const result = await executeBrowserTool(name, input, pg);
+      track(desc, 'success');
+      return toolResult(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+      track(desc, 'error', msg);
+      throw err;
+    }
+  }
+
+  return toolResult(await executeBrowserTool(name, input, pg));
 }
 
 export async function exploreAccounts(
@@ -169,40 +238,13 @@ export async function exploreAccounts(
   const collectedAccounts: Account[] = [];
 
   try {
+    const handleToolCall = handleAccountToolCall.bind(null, { collectedAccounts, track });
+
     return await runAgent<Account[]>(
       page,
       TOOLS,
       buildSystemPrompt(notes, existingAccounts),
-      async (name, input, pg) => {
-        if (name === REPORT_ACCOUNTS) {
-          const batch = (input as { accounts: Account[] }).accounts;
-          collectedAccounts.push(...batch);
-          track('report_accounts', 'success');
-          return toolResult(`${batch.length} accounts recorded (${collectedAccounts.length} total so far). Navigate to the next section or call done_accounts if finished.`);
-        }
-
-        if (name === DONE_TOOL) {
-          track('done', 'success');
-          return toolDone<Account[]>(collectedAccounts, `done — ${collectedAccounts.length} accounts collected`);
-        }
-
-        if (TRACKED_TOOLS.has(name)) {
-          const desc = input.role
-            ? `${name}(${input.role} "${input.name}")`
-            : `${name}(${JSON.stringify(input)})`;
-          try {
-            const result = await executeBrowserTool(name, input, pg);
-            track(desc, 'success');
-            return toolResult(result);
-          } catch (err) {
-            const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
-            track(desc, 'error', msg);
-            throw err;
-          }
-        }
-
-        return toolResult(await executeBrowserTool(name, input, pg));
-      },
+      handleToolCall,
       sessionDir,
       'accounts',
       [],
