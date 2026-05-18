@@ -48,6 +48,38 @@ function pageStateMessage(snap: string, url: string): { type: 'text'; text: stri
   return { type: 'text', text: `Current page state:\nURL: ${url}\n\n${snap}` };
 }
 
+// Wait for the page to settle before snapshotting. Without this, a snapshot taken
+// immediately after a click (e.g. clicking Log In) captures the pre-navigation DOM
+// because domcontentloaded fires before the new page finishes rendering — causing the
+// agent to see the login page again and incorrectly infer that MFA is needed.
+// 8s covers slow SPA login API calls (e.g. Wealthsimple); if the page stays busy
+// past that we snapshot anyway rather than blocking indefinitely.
+async function takeSnapshot(
+  page: Page,
+  snapshotsDir: string,
+  snapPrefix: string,
+  snapCount: number,
+  redactSensitive: (text: string) => string,
+): Promise<{ snap: string; snapFile: string; url: string }> {
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+  let snap: string | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      snap = await page.locator('body').ariaSnapshot({ mode: 'ai' });
+      break;
+    } catch {
+      if (attempt < 2) await new Promise(r => setTimeout(r, 500));
+    }
+  }
+  if (snap === null) throw new Error('Could not snapshot page after 3 attempts');
+  snap = redactSensitive(snap);
+  const url = page.url();
+  const snapFile = `${snapshotsDir}/${snapPrefix}_${String(snapCount).padStart(3, '0')}.txt`;
+  await fs.writeFile(snapFile, `URL: ${url}\n\n${snap}`);
+  logSnapshot(snap, snapFile);
+  return { snap, snapFile, url };
+}
+
 async function summarizePage(
   snap: string, prevContext: string, systemPrompt: string, model: string,
 ): Promise<string> {
@@ -96,32 +128,6 @@ export async function runAgent<T>(
   const snapPrefix = `snapshot_${taskName}`;
   await fs.mkdir(snapshotsDir, { recursive: true });
 
-  async function takeSnapshot(): Promise<{ snap: string; snapFile: string; url: string }> {
-    // Wait for the page to settle before snapshotting. Without this, a snapshot taken
-    // immediately after a click (e.g. clicking Log In) captures the pre-navigation DOM
-    // because domcontentloaded fires before the new page finishes rendering — causing the
-    // agent to see the login page again and incorrectly infer that MFA is needed.
-    // 8s covers slow SPA login API calls (e.g. Wealthsimple); if the page stays busy
-    // past that we snapshot anyway rather than blocking indefinitely.
-    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-    let snap: string | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        snap = await page.locator('body').ariaSnapshot({ mode: 'ai' });
-        break;
-      } catch {
-        if (attempt < 2) await new Promise(r => setTimeout(r, 500));
-      }
-    }
-    if (snap === null) throw new Error('Could not snapshot page after 3 attempts');
-    snap = redactSensitive(snap);
-    const url = page.url();
-    const snapFile = `${snapshotsDir}/${snapPrefix}_${String(++snapCount).padStart(3, '0')}.txt`;
-    await fs.writeFile(snapFile, `URL: ${url}\n\n${snap}`);
-    logSnapshot(snap, snapFile);
-    return { snap, snapFile, url };
-  }
-
   // prevMessages holds compressed history. pendingToolResults is the non-snapshot content for the
   // next user turn: tool results on later turns. Each loop appends the fresh snapshot before
   // sending it to the API; archived user turns get the agent's page summary instead.
@@ -136,7 +142,7 @@ export async function runAgent<T>(
       `## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`,
   );
   for (let turn = 0; turn < maxTurns; turn++) {
-    const { snap, snapFile, url } = await takeSnapshot();
+    const { snap, snapFile, url } = await takeSnapshot(page, snapshotsDir, snapPrefix, ++snapCount, redactSensitive);
     // API receives the full snapshot content; the log records the file path instead
     // so conversation logs stay readable without the full ARIA tree on every turn.
     const contextBlock: ContentBlockParam[] = accumulatedContext
