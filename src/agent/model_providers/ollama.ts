@@ -94,7 +94,7 @@ function toOpenAIMessages(
       if (toolCalls.length > 0) {
         out.push({
           role: 'assistant',
-          content: textParts.join('') || null,
+          content: textParts.join(''),
           tool_calls: toolCalls,
         });
       } else {
@@ -233,7 +233,7 @@ export async function callOllama(params: ProviderCallParams): Promise<ProviderRe
     const textContent = message?.content ?? '';
     const retryMessages: ChatCompletionMessageParam[] = [
       ...messages,
-      { role: 'assistant', content: textContent || null },
+      { role: 'assistant', content: textContent },
       { role: 'user', content: 'You must call one of the provided tools. Do not write text.' },
     ];
     const retry = await getClient().chat.completions.create({
