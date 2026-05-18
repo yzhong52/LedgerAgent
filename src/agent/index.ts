@@ -22,21 +22,21 @@ export const MAX_TURNS = 20;
 
 export interface ToolContinue {
   done: false;
-  content: string;
+  summary: string;
 }
 
 export interface ToolDone<T> {
   done: true;
   value: T;
-  content: string;
+  summary: string;
 }
 
-export function toolResult(content: string): ToolContinue {
-  return { done: false, content };
+export function toolResult(summary: string): ToolContinue {
+  return { done: false, summary };
 }
 
-export function toolDone<T>(value: T, content: string): ToolDone<T> {
-  return { done: true, value, content };
+export function toolDone<T>(value: T, summary: string): ToolDone<T> {
+  return { done: true, value, summary };
 }
 
 function isDone<T>(r: ToolContinue | ToolDone<T>): r is ToolDone<T> {
@@ -44,8 +44,8 @@ function isDone<T>(r: ToolContinue | ToolDone<T>): r is ToolDone<T> {
 }
 
 
-function pageStateMessage(snap: string): { type: 'text'; text: string } {
-  return { type: 'text', text: `Current page state:\n${snap}` };
+function pageStateMessage(snap: string, url: string): { type: 'text'; text: string } {
+  return { type: 'text', text: `Current page state:\nURL: ${url}\n\n${snap}` };
 }
 
 async function summarizePage(
@@ -96,7 +96,7 @@ export async function runAgent<T>(
   const snapPrefix = `snapshot_${taskName}`;
   await fs.mkdir(snapshotsDir, { recursive: true });
 
-  async function takeSnapshot(): Promise<{ snap: string; snapFile: string }> {
+  async function takeSnapshot(): Promise<{ snap: string; snapFile: string; url: string }> {
     // Wait for the page to settle before snapshotting. Without this, a snapshot taken
     // immediately after a click (e.g. clicking Log In) captures the pre-navigation DOM
     // because domcontentloaded fires before the new page finishes rendering — causing the
@@ -115,10 +115,11 @@ export async function runAgent<T>(
     }
     if (snap === null) throw new Error('Could not snapshot page after 3 attempts');
     snap = redactSensitive(snap);
+    const url = page.url();
     const snapFile = `${snapshotsDir}/${snapPrefix}_${String(++snapCount).padStart(3, '0')}.txt`;
-    await fs.writeFile(snapFile, snap);
+    await fs.writeFile(snapFile, `URL: ${url}\n\n${snap}`);
     logSnapshot(snap, snapFile);
-    return { snap, snapFile };
+    return { snap, snapFile, url };
   }
 
   // prevMessages holds compressed history. pendingToolResults is the non-snapshot content for the
@@ -135,13 +136,13 @@ export async function runAgent<T>(
       `## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`,
   );
   for (let turn = 0; turn < maxTurns; turn++) {
-    const { snap, snapFile } = await takeSnapshot();
+    const { snap, snapFile, url } = await takeSnapshot();
     // API receives the full snapshot content; the log records the file path instead
     // so conversation logs stay readable without the full ARIA tree on every turn.
     const contextBlock: ContentBlockParam[] = accumulatedContext
       ? [{ type: 'text', text: `[accumulated context]\n${accumulatedContext}` }]
       : [];
-    const currentUserMsg = [...pendingToolResults, ...contextBlock, pageStateMessage(snap)];
+    const currentUserMsg = [...pendingToolResults, ...contextBlock, pageStateMessage(snap, url)];
 
     if (turn > 0) await fs.appendFile(logFile, '---\n\n');
     await fs.appendFile(logFile, `## Turn ${turn}\n\n`);
@@ -149,7 +150,7 @@ export async function runAgent<T>(
     await fs.appendFile(
       logFile,
       `\`\`\`json\n` +
-        `${redactSensitive(JSON.stringify([...pendingToolResults, pageStateMessage(snapFile)], null, 2))}` +
+        `${redactSensitive(JSON.stringify([...pendingToolResults, pageStateMessage(snapFile, url)], null, 2))}` +
         `\n\`\`\`\n\n`,
     );
 
@@ -203,11 +204,11 @@ export async function runAgent<T>(
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
-              content: redactSensitive(r.content),
+              content: redactSensitive(r.summary),
             });
             completion = { value: r.value };
           } else {
-            output = redactSensitive(r.content);
+            output = redactSensitive(r.summary);
             logToolResult(toolUse.name, output);
             toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: output });
           }
