@@ -26,9 +26,8 @@ Login flow:
   3. If a multi-factor authentication (MFA) or verification code screen appears,
      call request_mfa_code with a short description of what the user should do.
      The tool returns the code — use the type tool (not fill) to enter it, then submit.
-  4. If a "Remember this device", "Trust this device", or similar checkbox or button
-     appears at any point, click or check it before proceeding. This avoids MFA prompts
-     on future logins.
+  4. If a "Remember this device", "Trust this device", “Remember me", or similar checkbox or 
+     button appears at any point, don't click it.
   5. Once you can see the account dashboard or portfolio summary, call success.
 
 After each action, the updated page state is provided automatically.${formatMemoryForPrompt(notes, 'login')}`;
