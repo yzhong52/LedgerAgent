@@ -142,6 +142,10 @@ Add a new file under `src/tasks/`. Import `runAgent` from `../agent` and browser
 function. Use `transactions.ts` as a reference — it shows the full pattern including memory
 integration, per-tool event tracking, and passing `maxTurns` to `runAgent`.
 
+## After making changes
+
+Run `npm run lint` after every code change and fix any errors before reporting the task as complete.
+
 ## Conventions
 
 - **No hardcoded tool name strings.** Tool names that are referenced in multiple places (e.g. `SUCCESS_TOOL` in `src/agent/index.ts`) must be defined as a named constant and imported — never duplicated as string literals.

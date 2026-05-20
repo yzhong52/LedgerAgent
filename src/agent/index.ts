@@ -143,7 +143,9 @@ export async function runAgent<T>(
       `## System Prompt\n\n${redactSensitive(systemPrompt)}\n\n`,
   );
   for (let turn = 0; turn < maxTurns; turn++) {
-    const { snap, snapFile, url } = await takeSnapshot(page, snapshotsDir, snapPrefix, ++snapCount, redactSensitive);
+    const { snap, snapFile, url } = await takeSnapshot(
+      page, snapshotsDir, snapPrefix, ++snapCount, redactSensitive,
+    );
     // API receives the full snapshot content; the log records the file path instead
     // so conversation logs stay readable without the full ARIA tree on every turn.
     const contextBlock: ContentBlockParam[] = accumulatedContext
