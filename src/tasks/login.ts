@@ -143,7 +143,7 @@ export async function login(
 
   let loginSucceeded = false;
   try {
-    await runAgent<void>(
+    await runAgent<true>(
       page,
       TOOLS,
       buildSystemPrompt(notes),
@@ -199,7 +199,7 @@ export async function login(
           }
           case LOGIN_TOOL.SUCCESS: {
             loginSucceeded = true;
-            return toolDone<void>(undefined, 'login complete');
+            return toolDone<true>(true, 'login complete');
           }
           default:
             if (TRACKED_TOOLS.has(name)) {

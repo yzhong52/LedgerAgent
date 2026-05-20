@@ -134,6 +134,7 @@ export async function runAgent<T>(
   const prevMessages: MessageParam[] = [];
   let pendingToolResults: ContentBlockParam[] = [];
   let accumulatedContext = '';
+  let done: T | undefined;
 
   const logFile = `${sessionDir}/conversation_${taskName}.md`;
   await fs.writeFile(
@@ -198,10 +199,9 @@ export async function runAgent<T>(
     if (toolUses.length === 0) throw new Error('unexpected: model returned no tool calls');
 
     const toolResults: ToolResultBlockParam[] = [];
-    let completion: { value: T } | undefined;
 
     for (const toolUse of toolUses) {
-      if (!completion) {
+      if (!done) {
         logToolUse(
           turn,
           maxTurns,
@@ -219,7 +219,7 @@ export async function runAgent<T>(
               tool_use_id: toolUse.id,
               content: redactSensitive(r.summary),
             });
-            completion = { value: r.value };
+            done = r.value;
           } else {
             output = redactSensitive(r.summary);
             logToolResult(toolUse.name, output);
@@ -242,14 +242,20 @@ export async function runAgent<T>(
       }
     }
 
-    if (!completion) {
-      // Store tool results as the non-snapshot content for the next turn; the snapshot is taken
-      // at the top of that turn so it captures the final post-tool page state.
-      pendingToolResults = toolResults;
-    } else {
-      return completion.value;
-    }
+    if (done) break;
+
+    // Store tool results as the non-snapshot content for the next turn; the snapshot is taken
+    // at the top of that turn so it captures the final post-tool page state.
+    pendingToolResults = toolResults;
   }
 
-  throw new Error(`agent did not complete within ${maxTurns} turns`);
+  await fs.appendFile(logFile, `## Summary\n\n`);
+
+  if (done) {
+    await fs.appendFile(logFile, `**Result:** success\n`);
+    return done;
+  } else {
+    await fs.appendFile(logFile, `**Result:** failed — agent did not complete within ${maxTurns} turns\n`);
+    throw new Error(`agent did not complete within ${maxTurns} turns`);
+  }
 }
