@@ -160,14 +160,21 @@ export async function runAgent<T>(
         `\n\`\`\`\n\n`,
     );
 
-    const response = await callWithTools({
-      model,
-      maxTokens,
-      system: systemPrompt,
-      tools,
-      prevMessages,
-      currentMessage: currentUserMsg,
-    });
+    let response;
+    try {
+      response = await callWithTools({
+        model,
+        maxTokens,
+        system: systemPrompt,
+        tools,
+        prevMessages,
+        currentMessage: currentUserMsg,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await fs.appendFile(logFile, `### Agent → User\n\n**Error:** ${msg}\n\n`);
+      throw err;
+    }
 
     await fs.appendFile(logFile, `### Agent → User\n\n`);
     await fs.appendFile(
