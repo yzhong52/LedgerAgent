@@ -50,8 +50,9 @@ async function pruneLogSessions(): Promise<void> {
 export async function createSession(institutionName: string): Promise<string> {
   const institutionSlug = slugifyLogName(institutionName);
   const now = new Date();
-  const date = now.toISOString().slice(0, 10);
-  const time = now.toTimeString().slice(0, 8).replace(/:/g, '');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
   const sessionDir = `${LOGS_DIR}/${date}_${time}_${milliseconds}_${institutionSlug}`;
   await fs.mkdir(sessionDir, { recursive: true });
