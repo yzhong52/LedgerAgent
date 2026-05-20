@@ -28,17 +28,19 @@ Logs into financial institution websites using a Claude-powered Playwright agent
 ## Running
 
 ```bash
-npm run cli -- institution add                                        # Add an institution (saves credentials to Keychain)
-npm run cli -- accounts sync                                          # Sync all accounts and balances
-npm run cli -- accounts sync --institution TD                         # Sync a single institution by name
-npm run cli -- accounts list                                          # List all stored accounts and latest balances
-npm run cli -- transactions sync                                      # Fetch transactions (last 30 days) for all accounts
-npm run cli -- transactions sync --institution TD --days 90           # Fetch 90 days for one institution
-npm run cli -- transactions sync --institution TD --accountId 1234    # Fetch transactions for one account only
-npm run cli -- transactions list                                      # List stored transactions (last 30 days)
-npm run cli -- transactions list --institution TD                     # Filter by institution
-npm run cli -- transactions list --days 7                             # Limit to last 7 days
-npm run cli -- config gmail                                           # Configure Gmail for automatic MFA
+npm run cli -- institution add                                              # Add an institution (saves credentials to Keychain)
+npm run cli -- sync                                                         # Interactive: choose institution and what to sync
+npm run cli -- sync --all                                                   # Sync accounts, holdings, and transactions for all institutions
+npm run cli -- sync --institution TD                                        # Sync a single institution
+npm run cli -- sync --all --skip-holdings --skip-transactions               # Sync accounts only (no holdings, no transactions)
+npm run cli -- sync --all --skip-accounts                                   # Sync transactions only (skip account discovery)
+npm run cli -- sync --institution TD --days 90                              # Fetch 90 days of transactions for one institution
+npm run cli -- sync --institution TD --accountId 1234 --skip-accounts       # Fetch transactions for one account only
+npm run cli -- accounts list                                                # List all stored accounts and latest balances
+npm run cli -- transactions list                                            # List stored transactions (last 30 days)
+npm run cli -- transactions list --institution TD                           # Filter by institution
+npm run cli -- transactions list --days 7                                   # Limit to last 7 days
+npm run cli -- config gmail                                                 # Configure Gmail for automatic MFA
 ```
 
 ## Architecture of login.ts
