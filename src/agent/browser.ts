@@ -165,6 +165,9 @@ export function byRole(page: Page, input: Record<string, unknown>, frame?: strin
 // SPAs don't fire a second 'load' event during in-app navigation; domcontentloaded is safe.
 async function afterClick(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+  // Waits for 500ms of no network activity — catches post-submit spinners (e.g. TD login)
+  // that leave the page in a transitional state the model can't act on.
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 }
 
 export async function executeBrowserTool(

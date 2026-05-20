@@ -34,28 +34,19 @@ After each action, the updated page state is provided automatically.${formatMemo
 }
 
 
-// Exactly one of ref, role+name, or selector must be provided.
-// oneOf encodes this as a hard schema constraint rather than relying on description text.
-const frame = { type: 'string', description: 'CSS selector of the iframe containing the field, e.g. "#loginFrame". Omit if the field is in the main frame.' };
+// Locator priority: ref > role+name > selector. The Anthropic API rejects oneOf/anyOf at
+// the top level of input_schema, so the priority order and "role+name must be used together"
+// rule are communicated via field descriptions instead.
 const credFieldSchema = {
   type: 'object' as const,
-  oneOf: [
-    {
-      description: 'Preferred: use the ARIA ref from the snapshot, e.g. "e32".',
-      properties: { ref: { type: 'string' }, frame },
-      required: ['ref'] as ['ref'],
-    },
-    {
-      description: 'Fallback: ARIA role and accessible name together, e.g. role="textbox" name="Username".',
-      properties: { role: { type: 'string' }, name: { type: 'string' }, frame },
-      required: ['role', 'name'] as ['role', 'name'],
-    },
-    {
-      description: 'Last resort: CSS selector when the field has no accessible name and no ref is available.',
-      properties: { selector: { type: 'string' }, frame },
-      required: ['selector'] as ['selector'],
-    },
-  ],
+  properties: {
+    ref:      { type: 'string', description: 'ARIA ref from the snapshot, e.g. "e32". FIRST CHOICE — always use this when the snapshot provides a ref for the field.' },
+    role:     { type: 'string', description: 'ARIA role, e.g. textbox, combobox. Must be used together with name — never omit role when using name.' },
+    name:     { type: 'string', description: 'Accessible name of the field (label text). Must be used together with role — never use name without role.' },
+    selector: { type: 'string', description: 'CSS selector, e.g. "#userId". Use only when the field has no accessible name and ref is unavailable.' },
+    frame:    { type: 'string', description: 'CSS selector of the iframe containing the field, e.g. "#loginFrame". Omit if the field is in the main frame.' },
+  },
+  required: [],
 };
 
 const LOGIN_TOOLS: Tool[] = [
