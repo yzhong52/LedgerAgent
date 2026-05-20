@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { Command } from 'commander';
 import { login } from '../tasks/login';
 import { exploreAccounts, type ExistingAccountHint } from '../tasks/accounts';
@@ -5,9 +6,12 @@ import { exploreHoldings } from '../tasks/holdings';
 import { fetchTransactions } from '../tasks/transactions';
 import { createSession } from '../agent';
 import { keychainLoad } from '../keychain';
-import { openDb } from '../db';
+import { openDb, DATA_DIR } from '../db';
 import { saveSync, saveHoldings, saveTransactions, listAccounts } from '../db/storage';
-import { prompt, readInstitutions, launchBrowser, printHoldingsTable, selectFromList, confirm } from './utils';
+import {
+  prompt, readInstitutions, launchBrowser, printHoldingsTable, selectFromList, confirm,
+  type Institution,
+} from './utils';
 import { printAccountSyncResult } from './accounts';
 import { printTransactionSyncResult } from './transactions';
 
@@ -67,15 +71,19 @@ export function makeSyncCommand(): Command {
       }
 
       const { db, close } = openDb();
-      const context = await launchBrowser();
-      try {
-        const page = context.pages()[0] ?? await context.newPage();
-        for (const inst of institutions) {
-          const password = keychainLoad(inst.name, inst.username);
-          if (!password) {
-            console.warn(`No password found in Keychain for ${inst.name} (${inst.username}), skipping.`);
-            continue;
-          }
+
+      const syncInstitution = async (inst: Institution) => {
+        const password = keychainLoad(inst.name, inst.username);
+        if (!password) {
+          console.warn(`No password found in Keychain for ${inst.name} (${inst.username}), skipping.`);
+          return;
+        }
+
+        const slug = inst.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const profileDir = path.join(DATA_DIR, `browser-profile-${slug}`);
+        const context = await launchBrowser(profileDir);
+        try {
+          const page = context.pages()[0] ?? await context.newPage();
 
           console.log(`\n🤖 Syncing ${inst.name}... ⏳`);
           const sessionDir = await createSession(inst.name);
@@ -155,7 +163,7 @@ export function makeSyncCommand(): Command {
                   `Account "${opts.accountId}" not found under ${inst.name}. ` +
                   `Run: npm run cli -- sync --institution ${inst.name}`,
                 );
-                continue;
+                return;
               }
               accountsToSync = [{ name: match.accountName, accountId: match.accountId }];
             } else {
@@ -165,7 +173,7 @@ export function makeSyncCommand(): Command {
                   `No accounts found for ${inst.name}. ` +
                   `Run: npm run cli -- sync --institution ${inst.name}`,
                 );
-                continue;
+                return;
               }
               accountsToSync = dbAccounts.map(a => ({
                 name: a.accountName,
@@ -190,13 +198,24 @@ export function makeSyncCommand(): Command {
               }
             }
           }
+        } finally {
+          await context.close();
         }
-      } catch (err) {
-        console.error(`\n❌ ${err instanceof Error ? err.message : String(err)}`);
+      };
+
+      try {
+        const results = await Promise.allSettled(institutions.map(syncInstitution));
+        for (const [i, result] of results.entries()) {
+          if (result.status === 'rejected') {
+            console.error(
+              `\n❌ ${institutions[i].name}: ` +
+              `${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+            );
+          }
+        }
       } finally {
         close();
         await prompt('\nPress Enter to close... ');
-        await context.close();
       }
     });
 }

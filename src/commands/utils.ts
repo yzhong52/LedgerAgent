@@ -17,8 +17,8 @@ export const INSTITUTIONS_FILE = path.join(DATA_DIR, 'institutions.json');
 export const PROFILE_DIR =
   process.env.LEDGERAGENT_PROFILE_DIR ?? path.join(DATA_DIR, 'browser-profile');
 
-export async function launchBrowser(): Promise<BrowserContext> {
-  await fs.mkdir(PROFILE_DIR, { recursive: true });
+export async function launchBrowser(profileDir: string = PROFILE_DIR): Promise<BrowserContext> {
+  await fs.mkdir(profileDir, { recursive: true });
 
   const args = [
     // Suppresses `navigator.webdriver` and other Blink automation signals used by
@@ -31,7 +31,7 @@ export async function launchBrowser(): Promise<BrowserContext> {
     '--disable-features=PasswordManagerEnabled',
   ];
 
-  return chromium.launchPersistentContext(PROFILE_DIR, {
+  return chromium.launchPersistentContext(profileDir, {
     headless: false,
     // Use official Google Chrome rather than Chromium so the Chrome Web Store
     // recognizes the browser and enables the "Add to Chrome" button.
