@@ -34,18 +34,16 @@ After each action, the updated page state is provided automatically.${formatMemo
 }
 
 
-// Either (role + name) or selector must be provided. JSON Schema can't express
-// "one of two alternatives" as a required constraint, so required is left empty and
-// the mutual exclusivity is communicated to Claude via the field descriptions instead.
-// If Claude omits both, credLocator will call getByRole(undefined) and Playwright will
-// throw — that error is returned to Claude as a tool result so it can retry correctly.
+// Locator priority: ref > role+name > selector. JSON Schema can't express mutual
+// exclusivity as a required constraint, so the priority order and "role+name must be
+// used together" rule are communicated via field descriptions instead.
 const credFieldSchema = {
   type: 'object' as const,
   properties: {
-    ref:      { type: 'string', description: 'ARIA ref from the snapshot, e.g. "e32". Preferred when role+name matching fails — the actual credential value is still injected locally.' },
-    role:     { type: 'string', description: 'ARIA role, e.g. textbox, combobox. Use with name to locate by accessibility tree.' },
-    name:     { type: 'string', description: 'Accessible name of the field (label text). Required when using role.' },
-    selector: { type: 'string', description: 'CSS selector, e.g. "#userId". Use when the field has no accessible name and role+name matching fails.' },
+    ref:      { type: 'string', description: 'ARIA ref from the snapshot, e.g. "e32". FIRST CHOICE — always use this when the snapshot provides a ref for the field.' },
+    role:     { type: 'string', description: 'ARIA role, e.g. textbox, combobox. Must be used together with name — never omit role when using name.' },
+    name:     { type: 'string', description: 'Accessible name of the field (label text). Must be used together with role — never use name without role.' },
+    selector: { type: 'string', description: 'CSS selector, e.g. "#userId". Use only when the field has no accessible name and ref is unavailable.' },
     frame:    { type: 'string', description: 'CSS selector of the iframe containing the field, e.g. "#loginFrame". Omit if the field is in the main frame.' },
   },
   required: [],

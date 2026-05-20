@@ -20,11 +20,16 @@ export const PROFILE_DIR =
 export async function launchBrowser(): Promise<BrowserContext> {
   await fs.mkdir(PROFILE_DIR, { recursive: true });
 
-  // Prevents financial institution firewalls (e.g., Cloudflare, Akamai) from instantly
-  // blocking the session. This flag suppresses `navigator.webdriver` and other internal
-  // Blink-engine automation signals used for bot detection.
-  // See: https://developer.chrome.com/docs/chromedriver/security-considerations
-  const args = ['--disable-blink-features=AutomationControlled'];
+  const args = [
+    // Suppresses `navigator.webdriver` and other Blink automation signals used by
+    // financial institution bot-detection (Cloudflare, Akamai, etc.).
+    // See: https://developer.chrome.com/docs/chromedriver/security-considerations
+    '--disable-blink-features=AutomationControlled',
+    // Chrome's credential manager shows a "Would you like to log in?" dialog after the
+    // username is filled. Its ARIA refs change every page load, so the agent wastes turns
+    // chasing it instead of filling the password.
+    '--disable-features=PasswordManagerEnabled',
+  ];
 
   return chromium.launchPersistentContext(PROFILE_DIR, {
     headless: false,
