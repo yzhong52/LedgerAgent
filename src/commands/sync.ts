@@ -204,12 +204,13 @@ export function makeSyncCommand(): Command {
       };
 
       try {
-        const results = await Promise.allSettled(institutions.map(syncInstitution));
-        for (const [i, result] of results.entries()) {
-          if (result.status === 'rejected') {
+        for (const inst of institutions) {
+          try {
+            await syncInstitution(inst);
+          } catch (err) {
             console.error(
-              `\n❌ ${institutions[i].name}: ` +
-              `${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+              `\n❌ ${inst.name}: ` +
+              `${err instanceof Error ? err.message : String(err)}`,
             );
           }
         }
