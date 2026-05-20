@@ -138,15 +138,16 @@ export const BROWSER_TOOLS: Tool[] = [
   },
   {
     name: BROWSER_TOOL.PRESS_ENTER,
-    description: 'Press the Enter key on an element identified by ARIA role and name. Use to submit forms when clicking the submit button fails. Pass frame when the element is inside an iframe.',
+    description: 'Press the Enter key on an element. Use to submit forms when clicking the submit button fails. Identify the element by ref (preferred) or role+name. Pass frame when the element is inside an iframe.',
     input_schema: {
       type: 'object',
       properties: {
-        role:  { type: 'string' },
-        name:  { type: 'string' },
+        ref:   { type: 'string', description: 'ARIA ref from the snapshot, e.g. "e32". Preferred.' },
+        role:  { type: 'string', description: 'ARIA role. Use with name when ref is unavailable.' },
+        name:  { type: 'string', description: 'Accessible name. Use with role when ref is unavailable.' },
         frame: { type: 'string', description: 'CSS selector for the containing iframe, if any' },
       },
-      required: ['role', 'name'],
+      required: [],
     },
   },
 ];
@@ -276,15 +277,18 @@ export async function executeBrowserTool(
     }
 
     case BROWSER_TOOL.PRESS_ENTER: {
-      const enterLocator = input.frame
-        ? page.frameLocator(input.frame as string).getByRole(
-          input.role as Parameters<typeof page.getByRole>[0],
-          { name: input.name as string },
-        )
-        : byRole(page, input);
+      const enterLocator = input.ref
+        ? page.locator(`aria-ref=${input.ref as string}`)
+        : input.frame
+          ? page.frameLocator(input.frame as string).getByRole(
+            input.role as Parameters<typeof page.getByRole>[0],
+            { name: input.name as string },
+          )
+          : byRole(page, input);
       await enterLocator.press('Enter', { timeout: 5000 });
       await afterClick(page);
-      return `pressed Enter on ${input.role} "${input.name}"`;
+      const desc = input.ref ? `ref=${input.ref as string}` : `${input.role} "${input.name}"`;
+      return `pressed Enter on ${desc}`;
     }
 
     default:
