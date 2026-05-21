@@ -26,9 +26,11 @@ export async function launchBrowser(profileDir: string = PROFILE_DIR): Promise<B
     // See: https://developer.chrome.com/docs/chromedriver/security-considerations
     '--disable-blink-features=AutomationControlled',
     // Chrome's credential manager shows a "Would you like to log in?" dialog after the
-    // username is filled. Its ARIA refs change every page load, so the agent wastes turns
-    // chasing it instead of filling the password.
+    // username is filled, and a "Save this password?" bubble after form submission.
+    // Both distract the agent (stale ARIA refs) and are unnecessary since credentials
+    // are stored in the macOS Keychain.
     '--disable-features=PasswordManagerEnabled',
+    '--disable-save-password-bubble',
   ];
 
   return chromium.launchPersistentContext(profileDir, {

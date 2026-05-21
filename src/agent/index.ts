@@ -7,7 +7,7 @@ import type {
 import type { Page } from 'playwright';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { redact } from './redact';
+import { redact, type SensitiveValue } from './redact';
 import { callWithTools, callForText } from './model_providers';
 import {
   logSnapshot,
@@ -117,7 +117,7 @@ export async function runAgent<T>(
   ) => Promise<ToolContinue | ToolDone<T>>,
   sessionDir: string,
   taskName: string,
-  sensitiveValues: string[] = [],
+  sensitiveValues: SensitiveValue[] = [],
   maxTurns: number,
   maxTokens: number,
   model: string,

@@ -175,14 +175,30 @@ export async function login(
             await credLocator(input).fill(creds.password, { timeout: 5000 });
             track(`fill_password(${credDesc(input)})`, 'success');
             return toolResult(`filled ${credDesc(input)} with password`);
-          case LOGIN_TOOL.TYPE_USERNAME:
-            await credLocator(input).pressSequentially(creds.username, { timeout: 5000 });
+          case LOGIN_TOOL.TYPE_USERNAME: {
+            const loc = credLocator(input);
+            if (!await loc.isEditable()) {
+              return toolResult(`error: ${credDesc(input)} is not an editable element — target the textbox ref, not its label or container`);
+            }
+            await loc.click({ timeout: 5000 });
+            await loc.press('Control+A');
+            await loc.press('Delete');
+            await loc.pressSequentially(creds.username, { timeout: 5000 });
             track(`type_username(${credDesc(input)})`, 'success');
             return toolResult(`typed username into ${credDesc(input)}`);
-          case LOGIN_TOOL.TYPE_PASSWORD:
-            await credLocator(input).pressSequentially(creds.password, { timeout: 5000 });
+          }
+          case LOGIN_TOOL.TYPE_PASSWORD: {
+            const loc = credLocator(input);
+            if (!await loc.isEditable()) {
+              return toolResult(`error: ${credDesc(input)} is not an editable element — target the textbox ref, not its label or container`);
+            }
+            await loc.click({ timeout: 5000 });
+            await loc.press('Control+A');
+            await loc.press('Delete');
+            await loc.pressSequentially(creds.password, { timeout: 5000 });
             track(`type_password(${credDesc(input)})`, 'success');
             return toolResult(`typed password into ${credDesc(input)}`);
+          }
           case LOGIN_TOOL.FILL:
             await byRole(pg, input).fill(input.value as string, { timeout: 5000 });
             track(`fill(${input.role} "${input.name}")`, 'success');
@@ -221,7 +237,10 @@ export async function login(
       },
       sessionDir,
       'login',
-      [creds.username, creds.password],
+      [
+        { value: creds.username, label: '[USERNAME_REDACTED]' },
+        { value: creds.password, label: '[PASSWORD_REDACTED]' },
+      ],
       MAX_TURNS,
       1024,
       model,

@@ -7,12 +7,12 @@ export { BROWSER_TOOL };
 export const BROWSER_TOOLS: Tool[] = [
   {
     name: BROWSER_TOOL.CLICK,
-    description: 'Click an element identified by its ARIA role and accessible name. Pass frame when the element is inside an iframe. When multiple elements share the same role and name, pass nth (0-based) to pick the one you want — the order matches the ARIA snapshot top-to-bottom.',
+    description: 'Click an element by its ARIA role and accessible name. Example: to click a "Log in" button use role="button" name="Log in". Do NOT pass a "text" argument — use click_text for text-based matching. Pass frame when the element is inside an iframe. When multiple elements share the same role and name, pass nth (0-based) to pick the one you want — the order matches the ARIA snapshot top-to-bottom.',
     input_schema: {
       type: 'object',
       properties: {
-        role:  { type: 'string', description: 'ARIA role, e.g. button, link' },
-        name:  { type: 'string', description: 'Accessible name of the element' },
+        role:  { type: 'string', description: 'ARIA role, e.g. "button", "link", "checkbox"' },
+        name:  { type: 'string', description: 'Accessible name exactly as shown in the snapshot, e.g. "Log in"' },
         nth:   { type: 'number', description: '0-based index when multiple elements share the same role+name. Matches snapshot order.' },
         frame: { type: 'string', description: 'CSS selector for the containing iframe, if any' },
       },
@@ -32,7 +32,7 @@ export const BROWSER_TOOLS: Tool[] = [
   },
   {
     name: BROWSER_TOOL.CLICK_TEXT,
-    description: 'Click an element by its visible text content. Use when the button ARIA name is unclear or does not match visible text.',
+    description: 'Click an element by its visible text content. Use this instead of click when you only know the visible text and not the ARIA role.',
     input_schema: {
       type: 'object',
       properties: {
@@ -258,6 +258,9 @@ export async function executeBrowserTool(
 
     case BROWSER_TOOL.TYPE_REF: {
       const typeRefLocator = page.locator(`aria-ref=${input.ref}`);
+      if (!await typeRefLocator.isEditable()) {
+        return `error: ref=${input.ref} is not an editable element — target the textbox ref, not its label or container`;
+      }
       await typeRefLocator.click({ timeout: 5000 });
       await typeRefLocator.press('Control+A');
       await typeRefLocator.press('Delete');
