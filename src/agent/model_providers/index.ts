@@ -4,6 +4,8 @@ import { callAnthropic, callAnthropicForText } from './anthropic';
 import { callOllama, callOllamaForText } from './ollama';
 import type { ProviderCallParams, ProviderResponse } from './types';
 
+export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+
 export function isAnthropicModel(model: string): boolean {
   return model.startsWith('claude-');
 }
