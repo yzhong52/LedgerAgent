@@ -4,6 +4,8 @@ import { callAnthropic, callAnthropicForText } from './anthropic';
 import { callOllama, callOllamaForText } from './ollama';
 import type { ProviderCallParams, ProviderResponse } from './types';
 
+export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+
 export function isAnthropicModel(model: string): boolean {
   return model.startsWith('claude-');
 }
@@ -16,7 +18,9 @@ export async function callWithTools(params: ProviderCallParams): Promise<Provide
   return callOllama(params);
 }
 
-export async function callForText(model: string, userMessage: string): Promise<string> {
-  if (isAnthropicModel(model)) return callAnthropicForText(model, userMessage);
-  return callOllamaForText(model, userMessage);
+export async function callForText(
+  model: string, userMessage: string, maxTokens?: number,
+): Promise<string> {
+  if (isAnthropicModel(model)) return callAnthropicForText(model, userMessage, maxTokens);
+  return callOllamaForText(model, userMessage, maxTokens);
 }

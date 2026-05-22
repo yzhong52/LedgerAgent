@@ -14,6 +14,7 @@ import {
 } from './utils';
 import { printAccountSyncResult } from './accounts';
 import { printTransactionSyncResult } from './transactions';
+import { DEFAULT_MODEL } from '../agent/model_providers';
 
 export function makeSyncCommand(): Command {
   return new Command('sync')
@@ -27,7 +28,7 @@ export function makeSyncCommand(): Command {
     .option('--skip-transactions', 'Skip transaction fetch; only sync accounts')
     .option('-v, --verbose', 'Show accessibility snapshots in the terminal')
     .option('--demo', 'Hide sensitive data by randomizing balances and account numbers')
-    .option('--model <id>', 'Model ID to use — Claude (claude-*) or Ollama (e.g. qwen2.5-coder:14b-instruct-q8_0)', 'claude-haiku-4-5-20251001')
+    .option('--model <id>', 'Model ID to use — Claude (claude-*) or Ollama (e.g. qwen2.5-coder:14b-instruct-q8_0)', DEFAULT_MODEL)
     .action(async (opts: {
       institution?: string;
       all?: boolean;

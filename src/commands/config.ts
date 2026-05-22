@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { keychainSave, keychainLoad, keychainSaveApiKey, keychainLoadApiKey } from '../keychain';
 import { loadConfig, saveConfig } from '../config';
 import { fetchMfaCode } from '../gmail';
+import { DEFAULT_MODEL } from '../agent/model_providers';
 import { prompt, promptPassword } from './utils';
 
 export function makeConfigCommand(): Command {
@@ -59,7 +60,8 @@ More info: faq/how_to_config_gmail_for_mfa.md
     .command('gmail-test')
     .description('Test Gmail IMAP connection and search recent emails for MFA codes')
     .option('--since <duration>', 'how far back to search (e.g. 5m, 30m, 1h)', '5m')
-    .action(async (opts: { since: string }) => {
+    .option('--model <id>', 'Model ID to use for extraction', DEFAULT_MODEL)
+    .action(async (opts: { since: string; model: string }) => {
       const ms = parseDuration(opts.since);
       if (ms === null) {
         console.log(`Invalid --since value "${opts.since}". Use a duration like 5m, 30m, or 1h.`);
@@ -79,7 +81,9 @@ More info: faq/how_to_config_gmail_for_mfa.md
       console.log('Keychain      : password found');
       console.log('Connecting to imap.gmail.com...');
       const since = new Date(Date.now() - ms);
-      const code = await fetchMfaCode(since, ({ sender, subject, date, extractedCode }) => {
+      const code = await fetchMfaCode(since, opts.model, ({
+        sender, subject, date, extractedCode,
+      }) => {
         const ageMs = Date.now() - date.getTime();
         const ago = ageMs < 60000 ? '<1m ago' : `${Math.round(ageMs / 60000)}m ago`;
         const withinWindow = date >= since;
@@ -92,7 +96,7 @@ More info: faq/how_to_config_gmail_for_mfa.md
         }
       });
       if (code) {
-        console.log(`✅ MFA code found: ${code}`);
+        console.log(`\n🎉 Final result: Code ${code} extracted successfully.`);
       } else {
         console.log(`⚠️  No MFA code found in the last ${opts.since} (this is normal if no code was sent).`);
       }

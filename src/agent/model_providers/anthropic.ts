@@ -39,10 +39,12 @@ export async function callAnthropic(params: ProviderCallParams): Promise<Provide
   };
 }
 
-export async function callAnthropicForText(model: string, userMessage: string): Promise<string> {
+export async function callAnthropicForText(
+  model: string, userMessage: string, maxTokens = 512,
+): Promise<string> {
   const response = await getClient().messages.create({
     model,
-    max_tokens: 512,
+    max_tokens: maxTokens,
     messages: [{ role: 'user', content: userMessage }],
   });
   const block = response.content.find(b => b.type === 'text');
