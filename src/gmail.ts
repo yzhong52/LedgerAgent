@@ -46,10 +46,11 @@ export async function fetchMfaCode(
 
     try {
       let attempt = 0;
+      const seenUids = new Set<number>();
       do {
         // NOOP flushes pending server notifications so new messages appear in SEARCH
         await client.noop();
-        const code = await searchForCode(client, since, model, onEmailChecked);
+        const code = await searchForCode(client, since, model, seenUids, onEmailChecked);
         if (code) return code;
         if (onEmailChecked) break;
         if (++attempt % 5 === 0) console.log('Still waiting for MFA email... ⏳');
@@ -124,6 +125,7 @@ async function searchForCode(
   client: ImapFlow,
   since: Date,
   model: string,
+  seenUids: Set<number>,
   onEmailChecked?: (info: EmailInfo) => void,
 ): Promise<string | null> {
   // IMAP SINCE is day-granular; we filter by exact internalDate after fetching
@@ -138,6 +140,8 @@ async function searchForCode(
     range, { internalDate: true, envelope: true, source: true }, { uid: true },
   )) {
     if (!msg.internalDate || !msg.source) continue;
+    if (seenUids.has(msg.uid)) continue;
+    seenUids.add(msg.uid);
 
     const internalDate = new Date(msg.internalDate);
     const withinWindow = internalDate >= since;
