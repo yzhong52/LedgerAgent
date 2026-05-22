@@ -84,27 +84,17 @@ ${cleanedText}`,
 }
 
 export function extractMfaCode(text: string): string | null {
-  const getUniqueValidCodes = (regex: RegExp): string[] => {
-    const matches = Array.from(text.matchAll(regex));
-    const codes = matches.map(m => m[1]).filter(c => !/^(\d)\1+$/.test(c));
-    return Array.from(new Set(codes));
-  };
-
-  // Try contextual match first (global flag added)
-  const contextual = getUniqueValidCodes(
+  const patterns = [
     /(?:security code|verification code|one.time.{0,6}code|otp|passcode)\D{0,10}(\d{4,8})/gi,
-  );
-  // If exactly one unique code is found, it's safe to use.
-  if (contextual.length === 1) return contextual[0];
-  // If it's ambiguous (> 1 unique valid code), return null to fall back to the AI.
-  if (contextual.length > 1) return null;
-
-  // Fallback: any 6-digit numbers (global flag added)
-  const fallback = getUniqueValidCodes(/\b(\d{6})\b/g);
-  if (fallback.length === 1) return fallback[0];
-  // If ambiguous, let AI handle it.
-  if (fallback.length > 1) return null;
-
+    /\b(\d{6})\b/g,
+  ];
+  for (const pattern of patterns) {
+    const codes = Array.from(new Set(
+      Array.from(text.matchAll(pattern)).map(m => m[1]).filter(c => !/^(\d)\1+$/.test(c)),
+    ));
+    if (codes.length === 1) return codes[0];
+    if (codes.length > 1) return null; // ambiguous — let AI handle it
+  }
   return null;
 }
 
