@@ -178,7 +178,9 @@ export async function login(
           case LOGIN_TOOL.TYPE_USERNAME: {
             const loc = credLocator(input);
             if (!await loc.isEditable()) {
-              return toolResult(`error: ${credDesc(input)} is not an editable element — target the textbox ref, not its label or container`);
+              const msg = `${credDesc(input)} is not an editable element — target the textbox ref, not its label or container`;
+              track(`type_username(${credDesc(input)})`, 'error', msg);
+              return toolResult(`error: ${msg}`);
             }
             await loc.click({ timeout: 5000 });
             await loc.press('Control+A');
@@ -190,7 +192,9 @@ export async function login(
           case LOGIN_TOOL.TYPE_PASSWORD: {
             const loc = credLocator(input);
             if (!await loc.isEditable()) {
-              return toolResult(`error: ${credDesc(input)} is not an editable element — target the textbox ref, not its label or container`);
+              const msg = `${credDesc(input)} is not an editable element — target the textbox ref, not its label or container`;
+              track(`type_password(${credDesc(input)})`, 'error', msg);
+              return toolResult(`error: ${msg}`);
             }
             await loc.click({ timeout: 5000 });
             await loc.press('Control+A');
@@ -249,7 +253,7 @@ export async function login(
     if (events.length > 0) {
       console.log('🤖 Summarizing session... ⏳');
       const sessionNotes = await generateSessionNotes(
-        events, 'logging into a financial institution website', model,
+        events, 'logging into a financial institution website', model, notes,
       );
       await saveMemoryNotes(institutionName, 'login', sessionNotes);
     }

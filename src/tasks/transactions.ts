@@ -185,6 +185,7 @@ export async function fetchTransactions(
         events,
         `fetching transactions for account "${account.name}" at ${institutionName}`,
         model,
+        notes,
       );
       await saveMemoryNotes(institutionName, MEMORY_TASK, sessionNotes);
     }

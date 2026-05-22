@@ -194,6 +194,7 @@ export async function exploreHoldings(
         events,
         `fetching investment holdings for account "${account.name}" at ${institutionName}`,
         model,
+        notes,
       );
       await saveMemoryNotes(institutionName, TASK_NAME, sessionNotes);
     }

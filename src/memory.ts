@@ -108,7 +108,7 @@ export function formatMemoryForPrompt(notes: string, task: string): string {
 
 
 export async function generateSessionNotes(
-  events: ToolEvent[], taskContext: string, model: string,
+  events: ToolEvent[], taskContext: string, model: string, previousNotes: string = '',
 ): Promise<string> {
   if (events.length === 0) return '';
 
@@ -116,9 +116,21 @@ export async function generateSessionNotes(
     .map(e => `- ${e.description}: ${e.outcome === 'error' ? `FAILED (${e.error})` : 'ok'}`)
     .join('\n');
 
+  const previousSection = previousNotes
+    ? `Previous notes (may contain errors — correct anything this session disproves):\n${previousNotes}\n\n`
+    : '';
+
   const text = await callForText(
     model,
-    `You are reviewing a browser automation session for ${taskContext}. Here is the sequence of actions taken:\n\n${transcript}\n\nWrite 3-5 concise bullet points capturing:\n- Which selectors or tools worked well and should be tried first next time\n- Which failed and what succeeded instead\n- Any unusual flows or page structures encountered\n\nBe specific about element names and tools used. These notes will be injected into the next session's system prompt.\n\nDo not include a heading or title — start directly with the bullet points.`,
+    `You are reviewing a browser automation session for ${taskContext}.
+
+${previousSection}This session's actions:
+${transcript}
+
+Create or update the notes with 3-5 concise bullet points.
+Keep what is still accurate, correct anything this session proves wrong, and add new findings.
+Be specific about Playwright tool names, ARIA ref IDs, and CSS selectors.
+Do not include a heading — start directly with the bullet points.`,
   );
 
   return normalizeNotes(text);
