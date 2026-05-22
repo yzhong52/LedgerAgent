@@ -91,7 +91,9 @@ ${cleanedText}`,
 
 export function extractMfaCode(text: string): string | null {
   const patterns = [
+    // Contextual: code digits preceded by a keyword — avoids phone numbers and tracking IDs
     /(?:security code|verification code|one.time.{0,6}code|otp|passcode)\D{0,10}(\d{4,8})/gi,
+    // Fallback: any standalone 6-digit number
     /\b(\d{6})\b/g,
   ];
   for (const pattern of patterns) {
