@@ -129,7 +129,8 @@ ${transcript}
 
 Create or update the notes with 3-5 concise bullet points.
 Keep what is still accurate, correct anything this session proves wrong, and add new findings.
-Be specific about Playwright tool names, ARIA ref IDs, and CSS selectors.
+Be specific about Playwright tool names, data-testid values, ARIA roles, and element names.
+Do NOT include ARIA ref IDs (e.g. [ref=e42]) — they change every session and are useless in notes.
 Do not include a heading — start directly with the bullet points.`,
   );
 
