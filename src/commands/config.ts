@@ -94,7 +94,7 @@ More info: faq/how_to_config_gmail_for_mfa.md
         }
       });
       if (code) {
-        console.log(`✅ MFA code found: ${code}`);
+        console.log(`\n🎉 Final result: Code ${code} extracted successfully.`);
       } else {
         console.log(`⚠️  No MFA code found in the last ${opts.since} (this is normal if no code was sent).`);
       }
