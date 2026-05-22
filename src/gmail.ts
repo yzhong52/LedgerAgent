@@ -68,6 +68,9 @@ export async function fetchMfaCode(
   return null;
 }
 
+const MFA_CODE_RE = /^\d{4,8}$/;
+const ALL_SAME_DIGIT_RE = /^(\d)\1+$/;
+
 async function extractMfaCodeAI(cleanedText: string, model: string): Promise<string | null> {
   const response = await callForText(
     model,
@@ -79,7 +82,10 @@ ${cleanedText}`,
   );
   const code = response.trim();
   if (!code || code.toLowerCase() === 'none') return null;
-  if (!/^\d{4,8}$/.test(code)) return null;
+  if (!MFA_CODE_RE.test(code)) {
+    console.warn(`AI returned unexpected MFA code format: "${code}"`);
+    return null;
+  }
   return code;
 }
 
@@ -90,7 +96,7 @@ export function extractMfaCode(text: string): string | null {
   ];
   for (const pattern of patterns) {
     const codes = Array.from(new Set(
-      Array.from(text.matchAll(pattern)).map(m => m[1]).filter(c => !/^(\d)\1+$/.test(c)),
+      Array.from(text.matchAll(pattern)).map(m => m[1]).filter(c => !ALL_SAME_DIGIT_RE.test(c)),
     ));
     if (codes.length === 1) return codes[0];
     if (codes.length > 1) return null; // ambiguous — let AI handle it
