@@ -86,8 +86,8 @@ ${cleanedText}`,
 export function extractMfaCode(text: string): string | null {
   const getUniqueValidCodes = (regex: RegExp): string[] => {
     const matches = Array.from(text.matchAll(regex));
-    const codes = matches.map(m => m[1]);
-    return Array.from(new Set(codes)); // Only keep unique codes
+    const codes = matches.map(m => m[1]).filter(c => !/^(\d)\1+$/.test(c));
+    return Array.from(new Set(codes));
   };
 
   // Try contextual match first (global flag added)
@@ -143,7 +143,9 @@ async function searchForCode(
     if (shouldExtract) {
       const rawSource = msg.source.toString();
       const parsed = await simpleParser(rawSource);
-      const textContent = parsed.text || '';
+      // Prefer plain text; fall back to HTML with tags stripped for HTML-only emails.
+      const textContent = parsed.text
+        ?? (parsed.html ? parsed.html.replace(/<[^>]+>/g, ' ') : '');
       const cleaned = textContent.replace(/\s+/g, ' ').trim().slice(0, 8000);
 
       // Try regex first to save AI API costs, fall back to AI extractor.
