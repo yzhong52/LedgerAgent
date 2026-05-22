@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { keychainSave, keychainLoad, keychainSaveApiKey, keychainLoadApiKey } from '../keychain';
 import { loadConfig, saveConfig } from '../config';
+import { fetchMfaCode } from '../gmail';
 import { prompt, promptPassword } from './utils';
 
 export function makeConfigCommand(): Command {
@@ -55,6 +56,49 @@ More info: faq/how_to_config_gmail_for_mfa.md
     });
 
   cmd
+    .command('gmail-test')
+    .description('Test Gmail IMAP connection and search recent emails for MFA codes')
+    .option('--since <duration>', 'how far back to search (e.g. 5m, 30m, 1h)', '5m')
+    .action(async (opts: { since: string }) => {
+      const ms = parseDuration(opts.since);
+      if (ms === null) {
+        console.log(`Invalid --since value "${opts.since}". Use a duration like 5m, 30m, or 1h.`);
+        return;
+      }
+      const config = await loadConfig();
+      if (!config.gmailAddress) {
+        console.log('No Gmail address configured. Run: config gmail');
+        return;
+      }
+      const password = keychainLoad('gmail', config.gmailAddress);
+      if (!password) {
+        console.log(`No app password found for ${config.gmailAddress}. Run: config gmail`);
+        return;
+      }
+      console.log(`Gmail address : ${config.gmailAddress}`);
+      console.log('Keychain      : password found');
+      console.log('Connecting to imap.gmail.com...');
+      const since = new Date(Date.now() - ms);
+      const code = await fetchMfaCode(since, ({ sender, subject, date, extractedCode }) => {
+        const ageMs = Date.now() - date.getTime();
+        const ago = ageMs < 60000 ? '<1m ago' : `${Math.round(ageMs / 60000)}m ago`;
+        const withinWindow = date >= since;
+        const marker = withinWindow ? '-' : '–';
+        console.log(`  ${marker} "${subject}" from ${sender} (${ago})`);
+        if (withinWindow) {
+          console.log(extractedCode ? `     ✅ MFA code found: ${extractedCode}` : '     ❌ no code found');
+        } else {
+          console.log('     ⏭️  skipped (outside time window)');
+        }
+      });
+      if (code) {
+        console.log(`✅ MFA code found: ${code}`);
+      } else {
+        console.log(`⚠️  No MFA code found in the last ${opts.since} (this is normal if no code was sent).`);
+      }
+    });
+
+  cmd
     .command('anthropic')
     .description('Save Anthropic API key to Keychain')
     .action(async () => {
@@ -75,4 +119,11 @@ More info: faq/how_to_config_gmail_for_mfa.md
     });
 
   return cmd;
+}
+
+function parseDuration(s: string): number | null {
+  const m = s.match(/^(\d+)(m|h)$/);
+  if (!m) return null;
+  const value = parseInt(m[1], 10);
+  return m[2] === 'h' ? value * 60 * 60 * 1000 : value * 60 * 1000;
 }
