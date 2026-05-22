@@ -1,5 +1,6 @@
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
+import { convert as htmlToText } from 'html-to-text';
 import { keychainLoad } from './keychain';
 import { loadConfig } from './config';
 import { callForText } from './agent/model_providers';
@@ -68,25 +69,31 @@ export async function fetchMfaCode(
   return null;
 }
 
-const MFA_CODE_RE = /^\d{4,8}$/;
+const VALID_CODE_RE = /^\d{4,8}$/;
 const ALL_SAME_DIGIT_RE = /^(\d)\1+$/;
 
 async function extractMfaCodeAI(cleanedText: string, model: string): Promise<string | null> {
-  const response = await callForText(
-    model,
-    `Extract the MFA or verification code from this email. Reply with ONLY the numeric code digits.
+  try {
+    const response = await callForText(
+      model,
+      `Extract the MFA or verification code from this email. Reply with ONLY the numeric code digits.
 If there is no verification code, reply with exactly: none
 
 Email:
 ${cleanedText}`,
-  );
-  const code = response.trim();
-  if (!code || code.toLowerCase() === 'none') return null;
-  if (!MFA_CODE_RE.test(code)) {
-    console.warn(`AI returned unexpected MFA code format: "${code}"`);
+      20,
+    );
+    const code = response.trim();
+    if (!code || code.toLowerCase() === 'none') return null;
+    if (!VALID_CODE_RE.test(code)) {
+      console.warn(`AI returned unexpected MFA code format: "${code}"`);
+      return null;
+    }
+    return code;
+  } catch (err) {
+    console.warn(`AI MFA extraction failed: ${err instanceof Error ? err.message : err}`);
     return null;
   }
-  return code;
 }
 
 export function extractMfaCode(text: string): string | null {
@@ -126,7 +133,6 @@ async function searchForCode(
     envelope: true,
     source: true,
   };
-  
   const messages = client.fetch(range, fetchOptions, { uid: true });
   for await (const msg of messages) {
     if (!msg.internalDate || !msg.source) continue;
@@ -141,13 +147,17 @@ async function searchForCode(
     if (shouldExtract) {
       const rawSource = msg.source.toString();
       const parsed = await simpleParser(rawSource);
-      // Prefer plain text; fall back to HTML with tags stripped for HTML-only emails.
+      // Prefer plain text; fall back to HTML converted to text for HTML-only emails.
       const textContent = parsed.text
-        ?? (parsed.html ? parsed.html.replace(/<[^>]+>/g, ' ') : '');
+        ?? (parsed.html ? htmlToText(parsed.html, { wordwrap: false }) : '');
       const cleaned = textContent.replace(/\s+/g, ' ').trim().slice(0, 8000);
 
-      // Try regex first to save AI API costs, fall back to AI extractor.
-      extractedCode = extractMfaCode(cleaned) ?? await extractMfaCodeAI(cleaned, model);
+      // Try regex first to save AI API costs.
+      extractedCode = extractMfaCode(cleaned);
+      // Only call AI for emails within the time window — avoids unnecessary API costs in test mode.
+      if (extractedCode === null && withinWindow) {
+        extractedCode = await extractMfaCodeAI(cleaned, model);
+      }
     }
 
     if (onEmailChecked) {

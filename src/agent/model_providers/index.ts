@@ -18,7 +18,9 @@ export async function callWithTools(params: ProviderCallParams): Promise<Provide
   return callOllama(params);
 }
 
-export async function callForText(model: string, userMessage: string): Promise<string> {
-  if (isAnthropicModel(model)) return callAnthropicForText(model, userMessage);
-  return callOllamaForText(model, userMessage);
+export async function callForText(
+  model: string, userMessage: string, maxTokens?: number,
+): Promise<string> {
+  if (isAnthropicModel(model)) return callAnthropicForText(model, userMessage, maxTokens);
+  return callOllamaForText(model, userMessage, maxTokens);
 }

@@ -260,10 +260,12 @@ export async function callOllama(params: ProviderCallParams): Promise<ProviderRe
   return { toolUses, assistantContent, rawForLog: response };
 }
 
-export async function callOllamaForText(model: string, userMessage: string): Promise<string> {
+export async function callOllamaForText(
+  model: string, userMessage: string, maxTokens = 512,
+): Promise<string> {
   const response = await getClient().chat.completions.create({
     model,
-    max_tokens: 512,
+    max_tokens: maxTokens,
     messages: [{ role: 'user', content: userMessage }],
   });
   return response.choices[0]?.message.content ?? '';
