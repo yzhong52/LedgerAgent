@@ -1,9 +1,11 @@
 import { ImapFlow } from 'imapflow';
 import { keychainLoad } from './keychain';
 import { loadConfig } from './config';
+import { callForText } from './agent/model_providers';
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS  = 60000;
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
 export interface EmailInfo {
   sender: string;
@@ -18,6 +20,7 @@ export interface EmailInfo {
 export async function fetchMfaCode(
   since: Date,
   onEmailChecked?: (info: EmailInfo) => void,
+  model: string = DEFAULT_MODEL,
 ): Promise<string | null> {
   const { gmailAddress } = await loadConfig();
   if (!gmailAddress) return null;
@@ -46,7 +49,7 @@ export async function fetchMfaCode(
       do {
         // NOOP flushes pending server notifications so new messages appear in SEARCH
         await client.noop();
-        const code = await searchForCode(client, since, onEmailChecked);
+        const code = await searchForCode(client, since, model, onEmailChecked);
         if (code) return code;
         if (onEmailChecked) break;
         if (++attempt % 5 === 0) console.log('Still waiting for MFA email... ⏳');
@@ -64,6 +67,47 @@ export async function fetchMfaCode(
   return null;
 }
 
+// Rejects codes that are all the same digit (000000, 111111, etc.).
+function isObviouslyInvalid(code: string): boolean {
+  return /^(\d)\1+$/.test(code);
+}
+
+// Extracts readable plain text from a raw MIME email for AI processing.
+function cleanEmailSource(raw: string): string {
+  let text = raw;
+  // Drop base64-encoded blocks (images, attachments)
+  text = text.replace(/^([A-Za-z0-9+/]{76}\r?\n){4,}[A-Za-z0-9+/=]*\r?$/gm, '');
+  // Decode quoted-printable: soft line breaks and hex escapes
+  text = text.replace(/=\r?\n/g, '');
+  text = text.replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  // Strip CSS style blocks and HTML tags
+  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  text = text.replace(/<[^>]+>/g, ' ');
+  // Decode common HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+  // Collapse whitespace
+  text = text.replace(/\s+/g, ' ').trim();
+  return text.slice(0, 8000);
+}
+
+async function extractMfaCodeAI(text: string, model: string): Promise<string | null> {
+  const cleaned = cleanEmailSource(text);
+  const response = await callForText(
+    model,
+    `Extract the MFA or verification code from this email. Reply with ONLY the numeric code digits.
+If there is no verification code, reply with exactly: none
+
+Email:
+${cleaned}`,
+  );
+  const code = response.trim();
+  if (!code || code.toLowerCase() === 'none') return null;
+  if (!/^\d{4,8}$/.test(code)) return null;
+  if (isObviouslyInvalid(code)) return null;
+  return code;
+}
+
 export function extractMfaCode(text: string): string | null {
   // Try contextual match first — avoids matching SMS shortcodes or phone numbers
   // that appear earlier in the raw email source (e.g. "From: 864674").
@@ -76,14 +120,10 @@ export function extractMfaCode(text: string): string | null {
   return null;
 }
 
-// Rejects codes that are all the same digit (000000, 111111, etc.).
-function isObviouslyInvalid(code: string): boolean {
-  return /^(\d)\1+$/.test(code);
-}
-
 async function searchForCode(
   client: ImapFlow,
   since: Date,
+  model: string,
   onEmailChecked?: (info: EmailInfo) => void,
 ): Promise<string | null> {
   // IMAP SINCE is day-granular; we filter by exact internalDate after fetching
@@ -101,15 +141,17 @@ async function searchForCode(
 
     const internalDate = new Date(msg.internalDate);
     const withinWindow = internalDate >= since;
-    // Always extract in test mode (onEmailChecked) so the caller can show what was found
-    const extractedCode = (onEmailChecked || withinWindow)
-      ? extractMfaCode(msg.source.toString())
+    const shouldExtract = onEmailChecked || withinWindow;
+
+    // Use AI as primary extractor, fall back to regex if AI returns nothing.
+    const extractedCode = shouldExtract
+      ? (await extractMfaCodeAI(msg.source.toString(), model))
+        ?? extractMfaCode(msg.source.toString())
       : null;
 
     if (onEmailChecked) {
       const fromAddr = msg.envelope?.from?.[0];
-      const sender = fromAddr?.address
-        ?? (fromAddr?.name || 'unknown');
+      const sender = fromAddr?.address ?? (fromAddr?.name || 'unknown');
       onEmailChecked({
         sender,
         subject: msg.envelope?.subject ?? '(no subject)',
