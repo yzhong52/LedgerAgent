@@ -1,4 +1,5 @@
 import { ImapFlow } from 'imapflow';
+import { simpleParser } from 'mailparser';
 import { keychainLoad } from './keychain';
 import { loadConfig } from './config';
 import { callForText } from './agent/model_providers';
@@ -73,34 +74,14 @@ function isObviouslyInvalid(code: string): boolean {
   return /^(\d)\1+$/.test(code);
 }
 
-// Extracts readable plain text from a raw MIME email for AI processing.
-function cleanEmailSource(raw: string): string {
-  let text = raw;
-  // Drop base64-encoded blocks (images, attachments)
-  text = text.replace(/^([A-Za-z0-9+/]{76}\r?\n){4,}[A-Za-z0-9+/=]*\r?$/gm, '');
-  // Decode quoted-printable: soft line breaks and hex escapes
-  text = text.replace(/=\r?\n/g, '');
-  text = text.replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
-  // Strip CSS style blocks and HTML tags
-  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-  text = text.replace(/<[^>]+>/g, ' ');
-  // Decode common HTML entities
-  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
-  // Collapse whitespace
-  text = text.replace(/\s+/g, ' ').trim();
-  return text.slice(0, 8000);
-}
-
-async function extractMfaCodeAI(text: string, model: string): Promise<string | null> {
-  const cleaned = cleanEmailSource(text);
+async function extractMfaCodeAI(cleanedText: string, model: string): Promise<string | null> {
   const response = await callForText(
     model,
     `Extract the MFA or verification code from this email. Reply with ONLY the numeric code digits.
 If there is no verification code, reply with exactly: none
 
 Email:
-${cleaned}`,
+${cleanedText}`,
   );
   const code = response.trim();
   if (!code || code.toLowerCase() === 'none') return null;
@@ -147,11 +128,16 @@ async function searchForCode(
     const withinWindow = internalDate >= since;
     const shouldExtract = onEmailChecked || withinWindow;
 
-    // Use AI as primary extractor, fall back to regex if AI returns nothing.
-    const extractedCode = shouldExtract
-      ? (await extractMfaCodeAI(msg.source.toString(), model))
-        ?? extractMfaCode(msg.source.toString())
-      : null;
+    let extractedCode: string | null = null;
+    if (shouldExtract) {
+      const rawSource = msg.source.toString();
+      const parsed = await simpleParser(rawSource);
+      const textContent = parsed.text || '';
+      const cleaned = textContent.replace(/\s+/g, ' ').trim().slice(0, 8000);
+
+      // Try regex first to save AI API costs, fall back to AI extractor.
+      extractedCode = extractMfaCode(cleaned) ?? await extractMfaCodeAI(cleaned, model);
+    }
 
     if (onEmailChecked) {
       const fromAddr = msg.envelope?.from?.[0];
