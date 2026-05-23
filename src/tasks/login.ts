@@ -23,12 +23,15 @@ Login flow:
   1. The current page state is already provided — use it to identify the login form fields.
   2. Use fill_username to enter the username and fill_password (or type_password for fields
      that require key events) to enter the password, then submit the form.
-  3. If a multi-factor authentication (MFA) or verification code screen appears,
+  3. If a page asks you to choose how to receive a verification code (e.g. text, call, email),
+     prefer the email option if one is available, select it, then click the Continue/Send/Next
+     button to trigger delivery before calling request_mfa_code.
+  4. If a multi-factor authentication (MFA) or verification code screen appears,
      call request_mfa_code with a short description of what the user should do.
      The tool returns the code — use the type tool (not fill) to enter it, then submit.
-  4. If a "Remember this device", "Trust this device", “Remember me", or similar checkbox or 
+  5. If a “Remember this device”, “Trust this device”, “Remember me”, or similar checkbox or
      button appears at any point, don't click it.
-  5. Once you can see the account dashboard or portfolio summary, call success.
+  6. Once you can see the account dashboard or portfolio summary, call success.
 
 After each action, the updated page state is provided automatically.${formatMemoryForPrompt(notes, 'login')}`;
 }
