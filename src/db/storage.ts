@@ -26,7 +26,8 @@ function normalizeType(raw: string | undefined): string | undefined {
 
 function normalizeCategory(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
-  return ACCOUNT_CATEGORIES.find(c => c.toLowerCase() === raw.toLowerCase()) ?? undefined;
+  const lower = raw.toLowerCase();
+  return ACCOUNT_CATEGORIES.find(c => c.toLowerCase() === lower) ?? undefined;
 }
 
 

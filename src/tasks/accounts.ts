@@ -37,12 +37,7 @@ export const ACCOUNT_CATEGORIES = [
   'Unknown',                 // Cannot determine from available page information
 ] as const;
 
-// Legacy category names, kept for backwards compatibility with existing DB rows.
-export const LEGACY_ACCOUNT_CATEGORIES = ['Brokerage', 'Managed Investment'] as const;
-
-export type AccountCategory =
-  | typeof ACCOUNT_CATEGORIES[number]
-  | typeof LEGACY_ACCOUNT_CATEGORIES[number];
+export type AccountCategory = typeof ACCOUNT_CATEGORIES[number];
 
 export interface Account {
   name: string;
