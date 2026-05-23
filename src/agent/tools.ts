@@ -50,6 +50,7 @@ export const LOGIN_TOOL = {
   TYPE_PASSWORD:    'type_password',
   REQUEST_MFA_CODE: 'request_mfa_code',
   SUCCESS:          SUCCESS_TOOL,
+  GIVE_UP:          GIVE_UP_TOOL,
 } as const;
 
 export const ACCOUNT_TOOL = {

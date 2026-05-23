@@ -3,7 +3,7 @@ import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import * as readline from 'readline';
 import { runAgent, toolDone, toolResult, MAX_TURNS, SEPARATOR } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, byRole, executeBrowserTool } from '../agent/browser';
-import { LOGIN_TOOL } from '../agent/tools';
+import { LOGIN_TOOL, GIVE_UP_TOOL } from '../agent/tools';
 import { fetchMfaCode } from '../gmail';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
@@ -32,7 +32,10 @@ Login flow:
   5. If a “Remember this device”, “Trust this device”, “Remember me”, or similar checkbox or
      button appears at any point, don't click it.
   6. Once you can see the account dashboard or portfolio summary, call success.
+  7. If the site is unavailable, shows a maintenance page, or you cannot make progress,
+     call give_up immediately — never respond with plain text.
 
+You must always respond by calling a tool. Never reply with text only.
 After each action, the updated page state is provided automatically.${formatMemoryForPrompt(notes, 'login')}`;
 }
 
@@ -115,6 +118,17 @@ const LOGIN_TOOLS: Tool[] = [
     description: 'Signal that login is complete and the dashboard is visible. Call this as soon as you can see the account overview.',
     input_schema: { type: 'object', properties: {} },
   },
+  {
+    name: LOGIN_TOOL.GIVE_UP,
+    description: 'Abort the login attempt. Call this when the site is unavailable, under maintenance, or you are unable to make progress.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        reason: { type: 'string', description: 'Brief explanation of why login cannot proceed.' },
+      },
+      required: ['reason'],
+    },
+  },
 ];
 
 const TOOLS = [...BROWSER_TOOLS, ...LOGIN_TOOLS];
@@ -131,7 +145,7 @@ const TRACKED_TOOLS = new Set<string>([
 export async function login(
   page: Page, url: string, creds: Credentials, institutionName: string, sessionDir: string,
   model: string,
-): Promise<void> {
+): Promise<boolean> {
   const loginStartedAt = new Date();
   const notes = await loadMemoryNotes(institutionName, 'login');
   const events: ToolEvent[] = [];
@@ -229,6 +243,11 @@ export async function login(
             loginSucceeded = true;
             return toolDone<true>(true, 'login complete');
           }
+          case LOGIN_TOOL.GIVE_UP: {
+            const reason = input.reason as string | undefined;
+            if (reason) console.log(`🤖 Agent gave up: ${reason}`);
+            return toolDone<true>(true, 'login aborted');
+          }
           default:
             if (TRACKED_TOOLS.has(name)) {
               const desc = input.role
@@ -268,6 +287,8 @@ export async function login(
   }
 
   if (loginSucceeded) console.log('🤖 Login complete 🎉');
+  else console.log('🤖 Login aborted.');
+  return loginSucceeded;
 }
 
 function promptUser(question: string): Promise<string> {

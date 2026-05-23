@@ -88,7 +88,7 @@ export function makeSyncCommand(): Command {
 
           console.log(`\n🤖 Syncing ${inst.name}... ⏳`);
           const sessionDir = await createSession(inst.name);
-          await login(
+          const loggedIn = await login(
             page,
             inst.url,
             { username: inst.username, password },
@@ -96,6 +96,11 @@ export function makeSyncCommand(): Command {
             sessionDir,
             opts.model,
           );
+
+          if (!loggedIn) {
+            console.log(`\n⚠️ Login aborted for ${inst.name} — skipping sync.`);
+            return;
+          }
 
           if (!opts.skipAccounts) {
             // --- Accounts ---
