@@ -47,8 +47,12 @@ export function makeSyncCommand(): Command {
         return;
       }
 
+      if (opts.skipAccounts && opts.skipHoldings && opts.skipTransactions) {
+        console.log('Nothing to sync: --skip-accounts, --skip-holdings, and --skip-transactions are all set.');
+        return;
+      }
+
       if (opts.verbose) process.env.VERBOSE = '1';
-      const lookbackDays = Math.max(1, parseInt(opts.days, 10) || 30);
 
       let institutions = await readInstitutions();
       if (institutions.length === 0) {
@@ -115,6 +119,8 @@ export function makeSyncCommand(): Command {
       };
 
       const syncTransactions = async (page: Page, inst: Institution, sessionDir: string) => {
+        const parsed = parseInt(opts.days, 10);
+        const lookbackDays = Number.isNaN(parsed) ? 30 : Math.max(1, parsed);
         console.log(`\n  💳 Transactions (last ${lookbackDays} days)`);
         let accountsToSync: { name: string; accountId: string }[];
         if (opts.accountId) {
