@@ -1,4 +1,5 @@
 import * as path from 'path';
+import type { Page } from 'playwright';
 import { Command } from 'commander';
 import { login } from '../tasks/login';
 import { exploreAccounts, type ExistingAccountHint } from '../tasks/accounts';
@@ -73,6 +74,90 @@ export function makeSyncCommand(): Command {
 
       const { db, close } = openDb();
 
+      const syncAccounts = async (page: Page, inst: Institution, sessionDir: string) => {
+        console.log(`\n  📋 Accounts`);
+        const existingAccounts: ExistingAccountHint[] = listAccounts(db)
+          .filter(a => a.institutionName === inst.name)
+          .map(a => ({
+            dbId: a.id,
+            name: a.accountName,
+            // institutionAccountId falls back to name when no real ID was found; omit if so
+            institutionAccountId: a.accountId !== a.accountName ? a.accountId : undefined,
+          }));
+        const accounts = await exploreAccounts(
+          page, inst.name, sessionDir, existingAccounts, opts.model,
+        );
+        const diff = saveSync(db, inst.name, inst.url, accounts);
+        printAccountSyncResult(
+          inst.name, diff,
+          listAccounts(db).filter(a => a.institutionName === inst.name),
+          { demo: opts.demo },
+        );
+      };
+
+      const syncHoldings = async (page: Page, inst: Institution, sessionDir: string) => {
+        console.log(`\n  📈 Holdings`);
+        const investmentAccounts = listAccounts(db).filter(
+          a =>
+            a.institutionName === inst.name &&
+            (a.accountCategory === 'Self-Directed Investing' ||
+              a.accountCategory === 'Managed Investing'),
+        );
+        for (const row of investmentAccounts) {
+          const holdings = await exploreHoldings(
+            page, inst.name, { name: row.accountName, accountId: row.accountId },
+            sessionDir, opts.model,
+          );
+          saveHoldings(db, row.id, holdings);
+          console.log(`  Holdings for ${row.accountName}:`);
+          printHoldingsTable(holdings);
+        }
+      };
+
+      const syncTransactions = async (page: Page, inst: Institution, sessionDir: string) => {
+        console.log(`\n  💳 Transactions (last ${lookbackDays} days)`);
+        let accountsToSync: { name: string; accountId: string }[];
+        if (opts.accountId) {
+          const match = listAccounts(db).find(
+            a => a.institutionName === inst.name && a.accountId.endsWith(opts.accountId!),
+          );
+          if (!match) {
+            console.log(
+              `Account "${opts.accountId}" not found under ${inst.name}. ` +
+              `Run: npm run cli -- sync --institution ${inst.name}`,
+            );
+            return;
+          }
+          accountsToSync = [{ name: match.accountName, accountId: match.accountId }];
+        } else {
+          const dbAccounts = listAccounts(db).filter(a => a.institutionName === inst.name);
+          if (dbAccounts.length === 0) {
+            console.log(
+              `No accounts found for ${inst.name}. ` +
+              `Run: npm run cli -- sync --institution ${inst.name}`,
+            );
+            return;
+          }
+          accountsToSync = dbAccounts.map(a => ({ name: a.accountName, accountId: a.accountId }));
+        }
+        for (const account of accountsToSync) {
+          try {
+            const txs = await fetchTransactions(
+              page, inst.name,
+              { name: account.name, accountId: account.accountId },
+              lookbackDays, sessionDir, opts.model,
+            );
+            const newTxs = saveTransactions(db, inst.name, account.accountId, txs);
+            printTransactionSyncResult(account.name, newTxs, txs.length);
+          } catch (err) {
+            console.error(
+              `  ❌ Transactions failed for ${account.name}: ` +
+              `${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
+      };
+
       const syncInstitution = async (inst: Institution) => {
         const password = keychainLoad(inst.name, inst.username);
         if (!password) {
@@ -89,12 +174,9 @@ export function makeSyncCommand(): Command {
           console.log(`\n🤖 Syncing ${inst.name}... ⏳`);
           const sessionDir = await createSession(inst.name);
           const loggedIn = await login(
-            page,
-            inst.url,
+            page, inst.url,
             { username: inst.username, password },
-            inst.name,
-            sessionDir,
-            opts.model,
+            inst.name, sessionDir, opts.model,
           );
 
           if (!loggedIn) {
@@ -102,105 +184,9 @@ export function makeSyncCommand(): Command {
             return;
           }
 
-          if (!opts.skipAccounts) {
-            // --- Accounts ---
-            console.log(`\n  📋 Accounts`);
-            const existingAccounts: ExistingAccountHint[] = listAccounts(db)
-              .filter(a => a.institutionName === inst.name)
-              .map(a => ({
-                dbId: a.id,
-                name: a.accountName,
-                // institutionAccountId falls back to name when no real ID was found; omit if so
-                institutionAccountId: a.accountId !== a.accountName ? a.accountId : undefined,
-              }));
-
-            const accounts = await exploreAccounts(
-              page,
-              inst.name,
-              sessionDir,
-              existingAccounts,
-              opts.model,
-            );
-            const diff = saveSync(db, inst.name, inst.url, accounts);
-            printAccountSyncResult(
-              inst.name, diff,
-              listAccounts(db).filter(a => a.institutionName === inst.name),
-              { demo: opts.demo },
-            );
-          }
-
-          if (!opts.skipHoldings) {
-            // --- Holdings ---
-            console.log(`\n  📈 Holdings`);
-            const investmentAccounts = listAccounts(db).filter(
-              a =>
-                a.institutionName === inst.name &&
-                (a.accountCategory === 'Self-Directed Investing' ||
-                  a.accountCategory === 'Managed Investing'),
-            );
-            for (const row of investmentAccounts) {
-              const holdings = await exploreHoldings(
-                page,
-                inst.name,
-                { name: row.accountName, accountId: row.accountId },
-                sessionDir,
-                opts.model,
-              );
-              saveHoldings(db, row.id, holdings);
-              console.log(`  Holdings for ${row.accountName}:`);
-              printHoldingsTable(holdings);
-            }
-          }
-
-          if (!opts.skipTransactions) {
-            // --- Transactions ---
-            console.log(`\n  💳 Transactions (last ${lookbackDays} days)`);
-
-            let accountsToSync: { name: string; accountId: string }[];
-            if (opts.accountId) {
-              const match = listAccounts(db).find(
-                a => a.institutionName === inst.name && a.accountId.endsWith(opts.accountId!),
-              );
-              if (!match) {
-                console.log(
-                  `Account "${opts.accountId}" not found under ${inst.name}. ` +
-                  `Run: npm run cli -- sync --institution ${inst.name}`,
-                );
-                return;
-              }
-              accountsToSync = [{ name: match.accountName, accountId: match.accountId }];
-            } else {
-              const dbAccounts = listAccounts(db).filter(a => a.institutionName === inst.name);
-              if (dbAccounts.length === 0) {
-                console.log(
-                  `No accounts found for ${inst.name}. ` +
-                  `Run: npm run cli -- sync --institution ${inst.name}`,
-                );
-                return;
-              }
-              accountsToSync = dbAccounts.map(a => ({
-                name: a.accountName,
-                accountId: a.accountId,
-              }));
-            }
-
-            for (const account of accountsToSync) {
-              try {
-                const txs = await fetchTransactions(
-                  page, inst.name,
-                  { name: account.name, accountId: account.accountId },
-                  lookbackDays, sessionDir, opts.model,
-                );
-                const newTxs = saveTransactions(db, inst.name, account.accountId, txs);
-                printTransactionSyncResult(account.name, newTxs, txs.length);
-              } catch (err) {
-                console.error(
-                  `  ❌ Transactions failed for ${account.name}: ` +
-                  `${err instanceof Error ? err.message : String(err)}`,
-                );
-              }
-            }
-          }
+          if (!opts.skipAccounts) await syncAccounts(page, inst, sessionDir);
+          if (!opts.skipHoldings) await syncHoldings(page, inst, sessionDir);
+          if (!opts.skipTransactions) await syncTransactions(page, inst, sessionDir);
         } finally {
           await context.close();
         }
