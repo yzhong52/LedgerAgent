@@ -122,33 +122,33 @@ export function makeSyncCommand(): Command {
               opts.model,
             );
             const diff = saveSync(db, inst.name, inst.url, accounts);
-            const allSyncedAccounts = listAccounts(db).filter(
-              a => a.institutionName === inst.name,
+            printAccountSyncResult(
+              inst.name, diff,
+              listAccounts(db).filter(a => a.institutionName === inst.name),
+              { demo: opts.demo },
             );
-            printAccountSyncResult(inst.name, diff, allSyncedAccounts, { demo: opts.demo });
+          }
 
-            if (!opts.skipHoldings) {
-              const investmentAccounts = accounts.filter(
-                a =>
-                  a.category === 'Self-Directed Investing' ||
-                  a.category === 'Managed Investing'
+          if (!opts.skipHoldings) {
+            // --- Holdings ---
+            console.log(`\n  📈 Holdings`);
+            const investmentAccounts = listAccounts(db).filter(
+              a =>
+                a.institutionName === inst.name &&
+                (a.accountCategory === 'Self-Directed Investing' ||
+                  a.accountCategory === 'Managed Investing'),
+            );
+            for (const row of investmentAccounts) {
+              const holdings = await exploreHoldings(
+                page,
+                inst.name,
+                { name: row.accountName, accountId: row.accountId },
+                sessionDir,
+                opts.model,
               );
-              for (const account of investmentAccounts) {
-                const row = allSyncedAccounts.find(
-                  r => r.accountId === (account.accountId ?? account.name),
-                );
-                if (!row) continue;
-                const holdings = await exploreHoldings(
-                  page,
-                  inst.name,
-                  account,
-                  sessionDir,
-                  opts.model,
-                );
-                saveHoldings(db, row.id, holdings);
-                console.log(`  Holdings for ${account.name}:`);
-                printHoldingsTable(holdings);
-              }
+              saveHoldings(db, row.id, holdings);
+              console.log(`  Holdings for ${row.accountName}:`);
+              printHoldingsTable(holdings);
             }
           }
 
