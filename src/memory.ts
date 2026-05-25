@@ -23,6 +23,8 @@ function normalizeNotes(notes: string | undefined): string {
   if (BAD_SUMMARY_PATTERNS.some(pattern => pattern.test(trimmed))) return '';
   // Strip a leading ## heading — the task name is already the section heading.
   trimmed = trimmed.replace(/^##[^\n]*\n+/, '').trim();
+  // Strip ARIA ref IDs — they change every session and are meaningless across runs.
+  trimmed = trimmed.replace(/\[ref=e\d+\]/g, '').replace(/\bref=e\d+\b/g, '').trim();
   return trimmed;
 }
 
@@ -103,7 +105,10 @@ export async function saveMemoryNotes(
 
 export function formatMemoryForPrompt(notes: string, task: string): string {
   if (!notes) return '';
-  return `\nNotes from previous ${task} sessions for this institution:\n${notes}`;
+  return (
+    `\nNotes from previous ${task} sessions for this institution (treat as hints, not rules —` +
+    ` sites change; always trust what you see on the current page over these notes):\n${notes}`
+  );
 }
 
 

@@ -21,8 +21,11 @@ You are a browser automation agent. Your job is to log into a financial institut
 
 Login flow:
   1. The current page state is already provided — use it to identify the login form fields.
-  2. Use fill_username to enter the username and fill_password (or type_password for fields
-     that require key events) to enter the password, then submit the form.
+  2. Use fill_username to enter the username. Then check the current snapshot — if no password
+     field is visible yet, click the Next/Continue button first and wait for the page to update
+     before filling the password.
+     Use fill_password (or type_password for fields that require key events) to enter the
+     password, then submit the form.
   3. If a page asks you to choose how to receive a verification code (e.g. text, call, email),
      prefer the email option if one is available, select it, then click the Continue/Send/Next
      button to trigger delivery before calling request_mfa_code.
@@ -273,7 +276,7 @@ export async function login(
         { value: creds.password, label: '[PASSWORD_REDACTED]' },
       ],
       MAX_TURNS,
-      1024,
+      2048,
       model,
     );
   } finally {
