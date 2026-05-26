@@ -9,7 +9,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { redact, type SensitiveValue } from './redact';
 import { callWithTools, callForText } from './model_providers';
+import type { ModelOptions } from './model_providers/types';
 import {
+  formatDuration,
   logSnapshot,
   logToolError,
   logToolResult,
@@ -82,6 +84,7 @@ async function takeSnapshot(
 
 async function summarizePage(
   snap: string, prevContext: string, systemPrompt: string, model: string,
+  modelOptions?: ModelOptions,
 ): Promise<string> {
   const prompt = [
     `Task context:\n${systemPrompt}`,
@@ -91,7 +94,7 @@ async function summarizePage(
       'Build on the previously seen context so the result is a full accumulated ' +
       'picture of what has been observed so far.',
   ].filter(Boolean).join('\n\n');
-  return callForText(model, prompt);
+  return callForText(model, prompt, undefined, modelOptions);
 }
 
 // T is the task's return type — e.g. Account[] for exploreAccounts, void for login.
@@ -121,6 +124,7 @@ export async function runAgent<T>(
   maxTurns: number,
   maxTokens: number,
   model: string,
+  modelOptions: ModelOptions = {},
 ): Promise<T> {
   let snapCount = 0;
   const redactSensitive = (text: string) => redact(text, sensitiveValues);
@@ -164,29 +168,54 @@ export async function runAgent<T>(
     );
 
     let response;
+    let modelDurationMs = 0;
     try {
+      const modelStartedAt = Date.now();
       response = await callWithTools({
         model,
+        modelOptions,
         maxTokens,
         system: systemPrompt,
         tools,
         prevMessages,
         currentMessage: currentUserMsg,
       });
+      modelDurationMs = Date.now() - modelStartedAt;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await fs.appendFile(logFile, `### Agent → User\n\n**Error:** ${msg}\n\n`);
       throw err;
     }
 
-    await fs.appendFile(logFile, `### Agent → User\n\n`);
+    await fs.appendFile(logFile, `### Agent → User (${formatDuration(modelDurationMs)})\n\n`);
     await fs.appendFile(
       logFile,
       `\`\`\`json\n${redactSensitive(JSON.stringify(response.rawForLog, null, 2))}\n\`\`\`\n\n`,
     );
 
-    accumulatedContext = await summarizePage(snap, accumulatedContext, systemPrompt, model);
-    await fs.appendFile(logFile, `### Accumulated Context\n\n${accumulatedContext}\n\n`);
+    const toolUses = response.toolUses;
+    if (toolUses.length === 0) throw new Error('unexpected: model returned no tool calls');
+    for (const toolUse of toolUses) {
+      logToolUse(
+        turn,
+        maxTurns,
+        toolUse.name,
+        toolUse.input as Record<string, unknown>,
+        redactSensitive,
+        modelDurationMs,
+      );
+    }
+
+    const summaryStartedAt = Date.now();
+    accumulatedContext = await summarizePage(
+      snap, accumulatedContext, systemPrompt, model, modelOptions,
+    );
+    const summaryDurationMs = Date.now() - summaryStartedAt;
+    await fs.appendFile(
+      logFile,
+      `### Accumulated Context (${formatDuration(summaryDurationMs)})\n\n` +
+        `${accumulatedContext}\n\n`,
+    );
 
     prevMessages.push({
       role: 'user',
@@ -197,21 +226,10 @@ export async function runAgent<T>(
       content: response.assistantContent as MessageParam['content'],
     });
 
-    const toolUses = response.toolUses;
-    if (toolUses.length === 0) throw new Error('unexpected: model returned no tool calls');
-
     const toolResults: ToolResultBlockParam[] = [];
 
     for (const toolUse of toolUses) {
       if (!done) {
-        logToolUse(
-          turn,
-          maxTurns,
-          toolUse.name,
-          toolUse.input as Record<string, unknown>,
-          redactSensitive,
-        );
-
         let output = '';
         try {
           const r = await onTool(toolUse.name, toolUse.input as Record<string, unknown>, page);

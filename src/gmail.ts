@@ -4,6 +4,7 @@ import { convert as htmlToText } from 'html-to-text';
 import { keychainLoad } from './keychain';
 import { loadConfig } from './config';
 import { callForText } from './agent/model_providers';
+import type { ModelOptions } from './agent/model_providers/types';
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS  = 60000;
@@ -21,6 +22,7 @@ export interface EmailInfo {
 export async function fetchMfaCode(
   since: Date,
   model: string,
+  modelOptions: ModelOptions = {},
   onEmailChecked?: (info: EmailInfo) => void,
 ): Promise<string | null> {
   const { gmailAddress } = await loadConfig();
@@ -51,7 +53,9 @@ export async function fetchMfaCode(
       do {
         // NOOP flushes pending server notifications so new messages appear in SEARCH
         await client.noop();
-        const code = await searchForCode(client, since, model, seenUids, onEmailChecked);
+        const code = await searchForCode(
+          client, since, model, modelOptions, seenUids, onEmailChecked,
+        );
         if (code) return code;
         if (onEmailChecked) break;
         if (++attempt % 5 === 0) console.log('Still waiting for MFA email... ⏳');
@@ -72,7 +76,11 @@ export async function fetchMfaCode(
 const VALID_CODE_RE = /^\d{4,8}$/;
 const ALL_SAME_DIGIT_RE = /^(\d)\1+$/;
 
-async function extractMfaCodeAI(cleanedText: string, model: string): Promise<string | null> {
+async function extractMfaCodeAI(
+  cleanedText: string,
+  model: string,
+  modelOptions: ModelOptions,
+): Promise<string | null> {
   try {
     const response = await callForText(
       model,
@@ -82,6 +90,7 @@ If there is no verification code, reply with exactly: none
 Email:
 ${cleanedText}`,
       20,
+      modelOptions,
     );
     const code = response.trim();
     if (!code || code.toLowerCase() === 'none') return null;
@@ -117,6 +126,7 @@ async function searchForCode(
   client: ImapFlow,
   since: Date,
   model: string,
+  modelOptions: ModelOptions,
   seenUids: Set<number>,
   onEmailChecked?: (info: EmailInfo) => void,
 ): Promise<string | null> {
@@ -156,7 +166,7 @@ async function searchForCode(
       extractedCode = extractMfaCode(cleaned);
       // Only call AI for emails within the time window — avoids unnecessary API costs in test mode.
       if (extractedCode === null && withinWindow) {
-        extractedCode = await extractMfaCodeAI(cleaned, model);
+        extractedCode = await extractMfaCodeAI(cleaned, model, modelOptions);
       }
     }
 

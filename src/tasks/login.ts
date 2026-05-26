@@ -4,6 +4,7 @@ import * as readline from 'readline';
 import { runAgent, toolDone, toolResult, MAX_TURNS, SEPARATOR } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, byRole, executeBrowserTool } from '../agent/browser';
 import { LOGIN_TOOL, GIVE_UP_TOOL } from '../agent/tools';
+import type { ModelOptions } from '../agent/model_providers/types';
 import { fetchMfaCode } from '../gmail';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
@@ -147,7 +148,7 @@ const TRACKED_TOOLS = new Set<string>([
 
 export async function login(
   page: Page, url: string, creds: Credentials, institutionName: string, sessionDir: string,
-  model: string,
+  model: string, modelOptions: ModelOptions = {},
 ): Promise<boolean> {
   const loginStartedAt = new Date();
   const notes = await loadMemoryNotes(institutionName, 'login');
@@ -233,12 +234,13 @@ export async function login(
             return toolResult(`typed into ${input.role} "${input.name}"`);
           case LOGIN_TOOL.REQUEST_MFA_CODE: {
             console.log(`\n${input.instructions as string}`);
-            const code = await fetchMfaCode(loginStartedAt, model) ?? (await promptUser(
-              '\n💡 Did you know you can forward text messages to email?\n' +
-              '   Android: https://github.com/yzhong52/auto-relay\n' +
-              '   iOS:     https://yzhong52.github.io/auto-relay/faq/setting-up-for-ios.html\n\n' +
-              'Please enter your code here: ',
-            )).trim();
+            const code = await fetchMfaCode(loginStartedAt, model, modelOptions)
+              ?? (await promptUser(
+                '\n💡 Did you know you can forward text messages to email?\n' +
+                '   Android: https://github.com/yzhong52/auto-relay\n' +
+                '   iOS:     https://yzhong52.github.io/auto-relay/faq/setting-up-for-ios.html\n\n' +
+                'Please enter your code here: ',
+              )).trim();
             track('request_mfa_code', 'success');
             return toolResult(code);
           }
@@ -278,12 +280,13 @@ export async function login(
       MAX_TURNS,
       2048,
       model,
+      modelOptions,
     );
   } finally {
     if (events.length > 0) {
       console.log('🤖 Summarizing session... ⏳');
       const sessionNotes = await generateSessionNotes(
-        events, 'logging into a financial institution website', model, notes,
+        events, 'logging into a financial institution website', model, notes, modelOptions,
       );
       await saveMemoryNotes(institutionName, 'login', sessionNotes);
     }

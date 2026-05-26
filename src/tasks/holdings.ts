@@ -3,6 +3,7 @@ import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import { runAgent, toolDone, toolResult, MAX_TURNS, SEPARATOR } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
 import { GIVE_UP_TOOL, HOLDING_TOOL } from '../agent/tools';
+import type { ModelOptions } from '../agent/model_providers/types';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
   generateSessionNotes, type ToolEvent,
@@ -134,6 +135,7 @@ export async function exploreHoldings(
   account: Pick<Account, 'name' | 'accountId'>,
   sessionDir: string,
   model: string,
+  modelOptions: ModelOptions = {},
 ): Promise<Holding[]> {
   console.log(SEPARATOR);
   console.log(`🤖 Fetching holdings for ${account.name}... ⏳`);
@@ -186,6 +188,7 @@ export async function exploreHoldings(
       MAX_TURNS,
       1024,
       model,
+      modelOptions,
     );
   } finally {
     if (events.length > 0) {
@@ -195,6 +198,7 @@ export async function exploreHoldings(
         `fetching investment holdings for account "${account.name}" at ${institutionName}`,
         model,
         notes,
+        modelOptions,
       );
       await saveMemoryNotes(institutionName, TASK_NAME, sessionNotes);
     }

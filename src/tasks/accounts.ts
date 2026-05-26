@@ -6,6 +6,7 @@ import {
 } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
 import { ACCOUNT_TOOL } from '../agent/tools';
+import type { ModelOptions } from '../agent/model_providers/types';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
   generateSessionNotes, type ToolEvent,
@@ -207,6 +208,7 @@ export async function exploreAccounts(
   sessionDir: string,
   existingAccounts: ExistingAccountHint[] = [],
   model: string,
+  modelOptions: ModelOptions = {},
 ): Promise<Account[]> {
   console.log(SEPARATOR);
   console.log('🤖 Exploring accounts... ⏳');
@@ -231,12 +233,14 @@ export async function exploreAccounts(
       MAX_TURNS,
       1024,
       model,
+      modelOptions,
     );
   } finally {
     if (events.length > 0) {
       console.log('🤖 Summarizing session... ⏳');
       const sessionNotes = await generateSessionNotes(
-        events, 'exploring a financial institution dashboard to discover all accounts', model, notes,
+        events, 'exploring a financial institution dashboard to discover all accounts',
+        model, notes, modelOptions,
       );
       await saveMemoryNotes(institutionName, MEMORY_TASK, sessionNotes);
     }

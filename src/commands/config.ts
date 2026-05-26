@@ -3,6 +3,7 @@ import { keychainSave, keychainLoad, keychainSaveApiKey, keychainLoadApiKey } fr
 import { loadConfig, saveConfig } from '../config';
 import { fetchMfaCode } from '../gmail';
 import { DEFAULT_MODEL } from '../agent/model_providers';
+import { REASONING_EFFORTS, type ReasoningEffort } from '../agent/model_providers/types';
 import { prompt, promptPassword } from './utils';
 
 export function makeConfigCommand(): Command {
@@ -61,10 +62,22 @@ More info: faq/how_to_config_gmail_for_mfa.md
     .description('Test Gmail IMAP connection and search recent emails for MFA codes')
     .option('--since <duration>', 'how far back to search (e.g. 5m, 30m, 1h)', '5m')
     .option('--model <id>', 'Model ID to use for extraction', DEFAULT_MODEL)
-    .action(async (opts: { since: string; model: string }) => {
+    .option(
+      '--reasoning-effort <level>',
+      'Reasoning effort for Ollama/OpenAI-compatible models: none, minimal, low, medium, high, xhigh',
+      'none',
+    )
+    .action(async (opts: { since: string; model: string; reasoningEffort: string }) => {
       const ms = parseDuration(opts.since);
       if (ms === null) {
         console.log(`Invalid --since value "${opts.since}". Use a duration like 5m, 30m, or 1h.`);
+        return;
+      }
+      if (!isReasoningEffort(opts.reasoningEffort)) {
+        console.log(
+          `Invalid --reasoning-effort "${opts.reasoningEffort}". ` +
+          `Use one of: ${REASONING_EFFORTS.join(', ')}`,
+        );
         return;
       }
       const config = await loadConfig();
@@ -81,7 +94,9 @@ More info: faq/how_to_config_gmail_for_mfa.md
       console.log('Keychain      : password found');
       console.log('Connecting to imap.gmail.com...');
       const since = new Date(Date.now() - ms);
-      const code = await fetchMfaCode(since, opts.model, ({
+      const code = await fetchMfaCode(since, opts.model, {
+        reasoningEffort: opts.reasoningEffort,
+      }, ({
         sender, subject, date, extractedCode,
       }) => {
         const ageMs = Date.now() - date.getTime();
@@ -130,4 +145,8 @@ function parseDuration(s: string): number | null {
   if (!m) return null;
   const value = parseInt(m[1], 10);
   return m[2] === 'h' ? value * 60 * 60 * 1000 : value * 60 * 1000;
+}
+
+function isReasoningEffort(value: string): value is ReasoningEffort {
+  return REASONING_EFFORTS.includes(value as ReasoningEffort);
 }

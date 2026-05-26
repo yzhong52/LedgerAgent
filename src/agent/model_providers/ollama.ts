@@ -4,7 +4,7 @@ import type {
   ChatCompletionMessageFunctionToolCall,
 } from 'openai/resources/chat/completions';
 import type { ContentBlockParam, MessageParam, Tool, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
-import type { ProviderCallParams, ProviderResponse } from './types';
+import type { ModelOptions, ProviderCallParams, ProviderResponse } from './types';
 
 let _client: OpenAI | null = null;
 function getClient(): OpenAI {
@@ -212,17 +212,14 @@ function extractToolUses(
   return parseToolCallsFromText(msg?.content ?? '');
 }
 
-// Qwen3 models run with thinking enabled by default in Ollama. Through Ollama's
-// OpenAI-compatible endpoint, reasoning_effort:'none' disables that extra work.
-function isQwen3(model: string): boolean {
-  return /qwen3/i.test(model);
-}
-
 type CompletionParams = OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
 
-function withOllamaReasoningDefaults(model: string, params: CompletionParams): CompletionParams {
-  if (!isQwen3(model)) return params;
-  return { ...params, reasoning_effort: 'none' };
+function withOllamaReasoningOptions(
+  params: CompletionParams,
+  modelOptions?: ModelOptions,
+): CompletionParams {
+  if (!modelOptions?.reasoningEffort) return params;
+  return { ...params, reasoning_effort: modelOptions.reasoningEffort };
 }
 
 function buildCompletionParams(
@@ -230,26 +227,28 @@ function buildCompletionParams(
   maxTokens: number,
   messages: ChatCompletionMessageParam[],
   tools: OpenAI.Chat.Completions.ChatCompletionTool[],
+  modelOptions?: ModelOptions,
 ): CompletionParams {
-  return withOllamaReasoningDefaults(model, {
+  return withOllamaReasoningOptions({
     model,
     max_tokens: maxTokens,
     messages,
     tools,
     tool_choice: 'required',
-  });
+  }, modelOptions);
 }
 
 function buildTextCompletionParams(
   model: string,
   maxTokens: number,
   messages: ChatCompletionMessageParam[],
+  modelOptions?: ModelOptions,
 ): CompletionParams {
-  return withOllamaReasoningDefaults(model, {
+  return withOllamaReasoningOptions({
     model,
     max_tokens: maxTokens,
     messages,
-  });
+  }, modelOptions);
 }
 
 export async function callOllama(params: ProviderCallParams): Promise<ProviderResponse> {
@@ -257,7 +256,7 @@ export async function callOllama(params: ProviderCallParams): Promise<ProviderRe
   const tools = toOpenAITools(params.tools);
 
   const response = await getClient().chat.completions.create(
-    buildCompletionParams(params.model, params.maxTokens, messages, tools),
+    buildCompletionParams(params.model, params.maxTokens, messages, tools, params.modelOptions),
   );
 
   const message = response.choices[0]?.message;
@@ -273,7 +272,9 @@ export async function callOllama(params: ProviderCallParams): Promise<ProviderRe
       { role: 'user', content: 'You must call one of the provided tools. Do not write text.' },
     ];
     const retry = await getClient().chat.completions.create(
-      buildCompletionParams(params.model, params.maxTokens, retryMessages, tools),
+      buildCompletionParams(
+        params.model, params.maxTokens, retryMessages, tools, params.modelOptions,
+      ),
     );
     toolUses = extractToolUses(retry.choices[0]?.message);
     if (toolUses.length === 0) {
@@ -293,13 +294,14 @@ export async function callOllama(params: ProviderCallParams): Promise<ProviderRe
 }
 
 export async function callOllamaForText(
-  model: string, userMessage: string, maxTokens = 512,
+  model: string, userMessage: string, maxTokens = 512, modelOptions?: ModelOptions,
 ): Promise<string> {
   const response = await getClient().chat.completions.create(
     buildTextCompletionParams(
       model,
       maxTokens,
       [{ role: 'user', content: userMessage }],
+      modelOptions,
     ),
   );
   return response.choices[0]?.message.content ?? '';

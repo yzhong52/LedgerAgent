@@ -16,6 +16,7 @@ import {
 import { printAccountSyncResult } from './accounts';
 import { printTransactionSyncResult } from './transactions';
 import { DEFAULT_MODEL } from '../agent/model_providers';
+import { REASONING_EFFORTS, type ModelOptions, type ReasoningEffort } from '../agent/model_providers/types';
 
 export function makeSyncCommand(): Command {
   return new Command('sync')
@@ -30,6 +31,11 @@ export function makeSyncCommand(): Command {
     .option('-v, --verbose', 'Show accessibility snapshots in the terminal')
     .option('--demo', 'Hide sensitive data by randomizing balances and account numbers')
     .option('--model <id>', 'Model ID to use — Claude (claude-*) or Ollama (e.g. qwen3.5:9b)', DEFAULT_MODEL)
+    .option(
+      '--reasoning-effort <level>',
+      'Reasoning effort for Ollama/OpenAI-compatible models: none, minimal, low, medium, high, xhigh',
+      'none',
+    )
     .action(async (opts: {
       institution?: string;
       all?: boolean;
@@ -41,7 +47,17 @@ export function makeSyncCommand(): Command {
       verbose: boolean;
       demo: boolean;
       model: string;
+      reasoningEffort: string;
     }) => {
+      if (!isReasoningEffort(opts.reasoningEffort)) {
+        console.log(
+          `Invalid --reasoning-effort "${opts.reasoningEffort}". ` +
+          `Use one of: ${REASONING_EFFORTS.join(', ')}`,
+        );
+        return;
+      }
+      const modelOptions: ModelOptions = { reasoningEffort: opts.reasoningEffort };
+
       if (opts.accountId && !opts.institution) {
         console.log('--accountId requires --institution.');
         return;
@@ -89,7 +105,7 @@ export function makeSyncCommand(): Command {
             institutionAccountId: a.accountId !== a.accountName ? a.accountId : undefined,
           }));
         const accounts = await exploreAccounts(
-          page, inst.name, sessionDir, existingAccounts, opts.model,
+          page, inst.name, sessionDir, existingAccounts, opts.model, modelOptions,
         );
         const diff = saveSync(db, inst.name, inst.url, accounts);
         printAccountSyncResult(
@@ -110,7 +126,7 @@ export function makeSyncCommand(): Command {
         for (const row of investmentAccounts) {
           const holdings = await exploreHoldings(
             page, inst.name, { name: row.accountName, accountId: row.accountId },
-            sessionDir, opts.model,
+            sessionDir, opts.model, modelOptions,
           );
           saveHoldings(db, row.id, holdings);
           console.log(`  Holdings for ${row.accountName}:`);
@@ -151,7 +167,7 @@ export function makeSyncCommand(): Command {
             const txs = await fetchTransactions(
               page, inst.name,
               { name: account.name, accountId: account.accountId },
-              lookbackDays, sessionDir, opts.model,
+              lookbackDays, sessionDir, opts.model, modelOptions,
             );
             const newTxs = saveTransactions(db, inst.name, account.accountId, txs);
             printTransactionSyncResult(account.name, newTxs, txs.length);
@@ -182,7 +198,7 @@ export function makeSyncCommand(): Command {
           const loggedIn = await login(
             page, inst.url,
             { username: inst.username, password },
-            inst.name, sessionDir, opts.model,
+            inst.name, sessionDir, opts.model, modelOptions,
           );
 
           if (!loggedIn) {
@@ -214,4 +230,8 @@ export function makeSyncCommand(): Command {
         await prompt('\nPress Enter to close... ');
       }
     });
+}
+
+function isReasoningEffort(value: string): value is ReasoningEffort {
+  return REASONING_EFFORTS.includes(value as ReasoningEffort);
 }
