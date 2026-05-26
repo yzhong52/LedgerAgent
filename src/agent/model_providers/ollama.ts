@@ -212,17 +212,53 @@ function extractToolUses(
   return parseToolCallsFromText(msg?.content ?? '');
 }
 
-export async function callOllama(params: ProviderCallParams): Promise<ProviderResponse> {
-  const messages = toOpenAIMessages(params.prevMessages, params.currentMessage, params.system);
-  const tools = toOpenAITools(params.tools);
+// Qwen3 models run with thinking enabled by default in Ollama. Through Ollama's
+// OpenAI-compatible endpoint, reasoning_effort:'none' disables that extra work.
+function isQwen3(model: string): boolean {
+  return /qwen3/i.test(model);
+}
 
-  const response = await getClient().chat.completions.create({
-    model: params.model,
-    max_tokens: params.maxTokens,
+type CompletionParams = OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
+
+function withOllamaReasoningDefaults(model: string, params: CompletionParams): CompletionParams {
+  if (!isQwen3(model)) return params;
+  return { ...params, reasoning_effort: 'none' };
+}
+
+function buildCompletionParams(
+  model: string,
+  maxTokens: number,
+  messages: ChatCompletionMessageParam[],
+  tools: OpenAI.Chat.Completions.ChatCompletionTool[],
+): CompletionParams {
+  return withOllamaReasoningDefaults(model, {
+    model,
+    max_tokens: maxTokens,
     messages,
     tools,
     tool_choice: 'required',
   });
+}
+
+function buildTextCompletionParams(
+  model: string,
+  maxTokens: number,
+  messages: ChatCompletionMessageParam[],
+): CompletionParams {
+  return withOllamaReasoningDefaults(model, {
+    model,
+    max_tokens: maxTokens,
+    messages,
+  });
+}
+
+export async function callOllama(params: ProviderCallParams): Promise<ProviderResponse> {
+  const messages = toOpenAIMessages(params.prevMessages, params.currentMessage, params.system);
+  const tools = toOpenAITools(params.tools);
+
+  const response = await getClient().chat.completions.create(
+    buildCompletionParams(params.model, params.maxTokens, messages, tools),
+  );
 
   const message = response.choices[0]?.message;
   let toolUses = extractToolUses(message);
@@ -236,13 +272,9 @@ export async function callOllama(params: ProviderCallParams): Promise<ProviderRe
       { role: 'assistant', content: textContent },
       { role: 'user', content: 'You must call one of the provided tools. Do not write text.' },
     ];
-    const retry = await getClient().chat.completions.create({
-      model: params.model,
-      max_tokens: params.maxTokens,
-      messages: retryMessages,
-      tools,
-      tool_choice: 'required',
-    });
+    const retry = await getClient().chat.completions.create(
+      buildCompletionParams(params.model, params.maxTokens, retryMessages, tools),
+    );
     toolUses = extractToolUses(retry.choices[0]?.message);
     if (toolUses.length === 0) {
       const preview = textContent ? `\nModel responded with text: ${textContent.slice(0, 300)}` : '';
@@ -263,10 +295,12 @@ export async function callOllama(params: ProviderCallParams): Promise<ProviderRe
 export async function callOllamaForText(
   model: string, userMessage: string, maxTokens = 512,
 ): Promise<string> {
-  const response = await getClient().chat.completions.create({
-    model,
-    max_tokens: maxTokens,
-    messages: [{ role: 'user', content: userMessage }],
-  });
+  const response = await getClient().chat.completions.create(
+    buildTextCompletionParams(
+      model,
+      maxTokens,
+      [{ role: 'user', content: userMessage }],
+    ),
+  );
   return response.choices[0]?.message.content ?? '';
 }
