@@ -8,8 +8,8 @@ Logs into financial institution websites using a Claude-powered Playwright agent
 
 - `src/cli.ts` — CLI entry point; wires up all subcommands
 - `src/commands/institution.ts` — `institution add` command
-- `src/commands/accounts.ts` — `accounts sync`, `accounts list`, `accounts merge` commands
-- `src/commands/transactions.ts` — `transactions sync`, `transactions list` commands
+- `src/commands/accounts.ts` — `accounts list`, `accounts merge` commands
+- `src/commands/transactions.ts` — `transactions list` command
 - `src/commands/config.ts` — `config gmail` command
 - `src/commands/utils.ts` — shared CLI helpers: `prompt`, `promptPassword`, `readInstitutions`, `writeInstitutions`
 - `src/keychain.ts` — macOS Keychain helpers

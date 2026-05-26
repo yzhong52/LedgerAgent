@@ -25,8 +25,8 @@ npm run cli -- config anthropic
 **Ollama** — install [Ollama](https://ollama.com), pull a model, and pass `--model` when syncing:
 
 ```bash
-ollama pull qwen2.5-coder:14b-instruct-q8_0
-npm run cli -- sync --model qwen2.5-coder:14b-instruct-q8_0
+ollama pull qwen3.5:9b
+npm run cli -- sync --model qwen3.5:9b
 ```
 
 No API key is needed when using Ollama. Set `OLLAMA_HOST` to override the default endpoint (`http://localhost:11434/v1`).
@@ -45,16 +45,10 @@ Add an institution:
 npm run cli -- institution add
 ```
 
-Sync accounts and balances:
+Sync accounts, balances, and transactions:
 
 ```bash
-npm run cli -- accounts sync --institution "TD"
-```
-
-Fetch recent transactions:
-
-```bash
-npm run cli -- transactions sync --institution "TD"
+npm run cli -- sync --institution "TD"
 ```
 
 List stored accounts and transactions:
@@ -95,24 +89,18 @@ npm run cli -- institution add
 
 You'll be prompted for the institution name, login URL, username or email, and password. Credentials are stored in the macOS Keychain — you won't be asked again.
 
-**Sync accounts and balances:**
+**Sync accounts and transactions:**
 
 ```bash
-npm run cli -- accounts sync
-npm run cli -- accounts sync --institution "TD"   # one institution only
+npm run cli -- sync                                                     # interactive: choose institution
+npm run cli -- sync --institution "TD"                                  # one institution only
+npm run cli -- sync --all                                               # all institutions non-interactively
+npm run cli -- sync --skip-transactions                                 # accounts and balances only
+npm run cli -- sync --institution "TD" --days 90                        # wider transaction window
+npm run cli -- sync --institution "TD" --accountId 1234 --skip-accounts # one account only
 ```
 
-Opens a real Chrome window, logs in, discovers all accounts and balances, and saves them to a local SQLite database.
-
-**Fetch transactions:**
-
-```bash
-npm run cli -- transactions sync                                        # last 30 days, all institutions
-npm run cli -- transactions sync --institution "TD" --days 90          # wider window
-npm run cli -- transactions sync --institution "TD" --accountId 1234   # one account only
-```
-
-Reads the accounts already in the DB, navigates to each account's transaction history, and saves the results. Run `accounts sync` first if no accounts are stored yet.
+Opens a real Chrome window, logs in, discovers all accounts and balances, and saves them to a local SQLite database. Fetches transactions for the configured lookback window (default: 30 days). Run `sync` before listing accounts if none are stored yet.
 
 **List stored accounts and latest balances:**
 
@@ -138,6 +126,15 @@ npm run cli -- config gmail
 ```
 
 See [faq/how_to_config_gmail_for_mfa.md](faq/how_to_config_gmail_for_mfa.md) for setup instructions, including how to forward SMS codes to Gmail if your institution sends MFA codes by text.
+
+**Test your Gmail setup** at any time:
+
+```bash
+# search last 5 minutes for MFA codes
+npm run cli -- config gmail-test
+# search last 30 minutes
+npm run cli -- config gmail-test --since 30m
+```
 
 ## Troubleshooting
 
