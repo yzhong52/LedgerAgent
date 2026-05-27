@@ -97,7 +97,7 @@ More info: faq/how_to_config_gmail_for_mfa.md
       const code = await fetchMfaCode(since, opts.model, {
         reasoningEffort: opts.reasoningEffort,
       }, ({
-        sender, subject, date, extractedCode,
+        sender, subject, date, extractedCode, aiElapsedSecs,
       }) => {
         const ageMs = Date.now() - date.getTime();
         const ago = ageMs < 60000 ? '<1m ago' : `${Math.round(ageMs / 60000)}m ago`;
@@ -105,6 +105,7 @@ More info: faq/how_to_config_gmail_for_mfa.md
         const marker = withinWindow ? '-' : '–';
         console.log(`  ${marker} "${subject}" from ${sender} (${ago})`);
         if (withinWindow) {
+          if (aiElapsedSecs) console.log(`     ✅ processed by ${opts.model} in ${aiElapsedSecs}s`);
           console.log(extractedCode ? `     ✅ MFA code found: ${extractedCode}` : '     ❌ no code found');
         } else {
           console.log('     ⏭️  skipped (outside time window)');
