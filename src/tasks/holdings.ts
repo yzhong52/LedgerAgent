@@ -135,7 +135,7 @@ export async function exploreHoldings(
   account: Pick<Account, 'name' | 'accountId'>,
   sessionDir: string,
   model: string,
-  modelOptions: ModelOptions = {},
+  modelOptions: ModelOptions,
 ): Promise<Holding[]> {
   console.log(SEPARATOR);
   console.log(`🤖 Fetching holdings for ${account.name}... ⏳`);

@@ -115,7 +115,7 @@ export function formatMemoryForPrompt(notes: string, task: string): string {
 
 export async function generateSessionNotes(
   events: ToolEvent[], taskContext: string, model: string, previousNotes: string = '',
-  modelOptions: ModelOptions = {},
+  modelOptions: ModelOptions,
 ): Promise<string> {
   if (events.length === 0) return '';
 

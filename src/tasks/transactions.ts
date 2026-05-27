@@ -119,7 +119,7 @@ export async function fetchTransactions(
   lookbackDays: number,
   sessionDir: string,
   model: string,
-  modelOptions: ModelOptions = {},
+  modelOptions: ModelOptions,
 ): Promise<Transaction[]> {
   console.log(SEPARATOR);
   console.log(`🤖 Fetching transactions for ${account.name}... ⏳`);

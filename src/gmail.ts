@@ -25,7 +25,7 @@ export interface EmailInfo {
 export async function fetchMfaCode(
   since: Date,
   model: string,
-  modelOptions: ModelOptions = {},
+  modelOptions: ModelOptions,
   onEmailChecked?: (info: EmailInfo) => void,
 ): Promise<string | null> {
   const { gmailAddress } = await loadConfig();

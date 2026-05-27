@@ -124,7 +124,7 @@ export async function runAgent<T>(
   maxTurns: number,
   maxTokens: number,
   model: string,
-  modelOptions: ModelOptions = {},
+  modelOptions: ModelOptions,
 ): Promise<T> {
   let snapCount = 0;
   const redactSensitive = (text: string) => redact(text, sensitiveValues);

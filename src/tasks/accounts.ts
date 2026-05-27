@@ -208,7 +208,7 @@ export async function exploreAccounts(
   sessionDir: string,
   existingAccounts: ExistingAccountHint[] = [],
   model: string,
-  modelOptions: ModelOptions = {},
+  modelOptions: ModelOptions,
 ): Promise<Account[]> {
   console.log(SEPARATOR);
   console.log('🤖 Exploring accounts... ⏳');
