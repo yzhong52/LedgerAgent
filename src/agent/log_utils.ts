@@ -81,9 +81,9 @@ export function logToolUse(
   name: string,
   input: Record<string, unknown>,
   redactSensitive: (text: string) => string,
-  durationMs?: number,
+  durationMs: number,
 ): void {
-  const duration = durationMs === undefined ? '' : ` (${formatDuration(durationMs)})`;
+  const duration = ` (${formatDuration(durationMs)})`;
   if (name === SUCCESS_TOOL) {
     console.log(`🔄 ${turn + 1}/${maxTurns} 💬 Mission accomplished${duration}`);
   } else if (VERBOSE) {

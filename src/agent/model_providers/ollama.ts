@@ -294,7 +294,7 @@ export async function callOllama(params: ProviderCallParams): Promise<ProviderRe
 }
 
 export async function callOllamaForText(
-  model: string, userMessage: string, maxTokens = 512, modelOptions?: ModelOptions,
+  model: string, userMessage: string, maxTokens: number, modelOptions?: ModelOptions,
 ): Promise<string> {
   const response = await getClient().chat.completions.create(
     buildTextCompletionParams(

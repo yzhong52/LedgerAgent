@@ -94,7 +94,7 @@ async function summarizePage(
       'Build on the previously seen context so the result is a full accumulated ' +
       'picture of what has been observed so far.',
   ].filter(Boolean).join('\n\n');
-  return callForText(model, prompt, undefined, modelOptions);
+  return callForText(model, prompt, 512, modelOptions);
 }
 
 // T is the task's return type — e.g. Account[] for exploreAccounts, void for login.

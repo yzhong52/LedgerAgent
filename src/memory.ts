@@ -139,7 +139,7 @@ Keep what is still accurate, correct anything this session proves wrong, and add
 Be specific about Playwright tool names, data-testid values, ARIA roles, and element names.
 Do NOT include ARIA ref IDs (e.g. [ref=e42]) — they change every session and are useless in notes.
 Do not include a heading — start directly with the bullet points.`,
-    undefined,
+    512,
     modelOptions,
   );
 

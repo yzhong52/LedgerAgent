@@ -14,7 +14,9 @@ export interface EmailInfo {
   subject: string;
   date: Date;
   extractedCode: string | null;
-  aiElapsedSecs: string | null; // set when AI extraction was used, e.g. "1.2"
+  // Elapsed seconds for AI extraction (e.g. "1.2"), or null when not used.
+  // AI is only invoked for emails within the time window AND when regex extraction found no code.
+  aiElapsedSecs: string | null;
 }
 
 // since is the login start time — only accept emails that arrived after login began,
