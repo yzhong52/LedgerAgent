@@ -162,41 +162,38 @@ async function searchForCode(
     const subject = msg.envelope?.subject ?? '(no subject)';
 
     const withinWindow = internalDate >= since;
-    const shouldExtract = onEmailChecked || withinWindow;
+
+    if (!withinWindow) continue;
 
     // Verbose per-email logging only for the normal (non-test) path — the onEmailChecked
     // callback used by `config gmail-test` does its own logging, so we must not double-print.
-    if (!onEmailChecked && withinWindow) {
+    if (!onEmailChecked) {
       console.log(`  – "${subject}" from ${sender} (${ageMins}m ago)`);
     }
 
-    let extractedCode: string | null = null;
+    const rawSource = msg.source.toString();
+    const parsed = await simpleParser(rawSource);
+    // Prefer plain text; fall back to HTML converted to text for HTML-only emails.
+    const textContent = parsed.text
+      ?? (parsed.html ? htmlToText(parsed.html, { wordwrap: false }) : '');
+    const cleaned = textContent.replace(/\s+/g, ' ').trim().slice(0, 8000);
+
+    // Try regex first to save AI API costs.
+    let extractedCode = extractMfaCode(cleaned);
     let aiElapsedSecs: string | null = null;
     let aiWarning: string | null = null;
-    if (shouldExtract) {
-      const rawSource = msg.source.toString();
-      const parsed = await simpleParser(rawSource);
-      // Prefer plain text; fall back to HTML converted to text for HTML-only emails.
-      const textContent = parsed.text
-        ?? (parsed.html ? htmlToText(parsed.html, { wordwrap: false }) : '');
-      const cleaned = textContent.replace(/\s+/g, ' ').trim().slice(0, 8000);
+    if (extractedCode === null) {
+      const aiStart = Date.now();
+      ({ code: extractedCode, warning: aiWarning } = await extractMfaCodeAI(
+        cleaned, model, modelOptions,
+      ));
+      aiElapsedSecs = ((Date.now() - aiStart) / 1000).toFixed(1);
+    }
 
-      // Try regex first to save AI API costs.
-      extractedCode = extractMfaCode(cleaned);
-      // Only call AI for emails within the time window — avoids unnecessary API costs in test mode.
-      if (extractedCode === null && withinWindow) {
-        const aiStart = Date.now();
-        ({ code: extractedCode, warning: aiWarning } = await extractMfaCodeAI(
-          cleaned, model, modelOptions,
-        ));
-        aiElapsedSecs = ((Date.now() - aiStart) / 1000).toFixed(1);
-      }
-
-      if (!onEmailChecked && withinWindow) {
-        if (aiWarning) console.warn(`     ⚠️  ${aiWarning}`);
-        if (aiElapsedSecs) console.log(`     ✅ processed by ${model} in ${aiElapsedSecs}s`);
-        if (!extractedCode) console.log('     ❌ no code found');
-      }
+    if (!onEmailChecked) {
+      if (aiWarning) console.warn(`     ⚠️  ${aiWarning}`);
+      if (aiElapsedSecs) console.log(`     ✅ processed by ${model} in ${aiElapsedSecs}s`);
+      if (!extractedCode) console.log('     ❌ no code found');
     }
 
     if (onEmailChecked) {

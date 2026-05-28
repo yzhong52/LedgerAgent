@@ -105,16 +105,11 @@ More info: faq/how_to_config_gmail_for_mfa.md
       }) => {
         const ageMs = Date.now() - date.getTime();
         const ago = ageMs < 60000 ? '<1m ago' : `${Math.round(ageMs / 60000)}m ago`;
-        const withinWindow = date >= since;
         console.log(`  ✉️  ${subject} (${ago})`);
         console.log(`     👤 from: ${sender}`);
-        if (withinWindow) {
-          if (aiWarning) console.log(`     ⚠️  ${aiWarning}`);
-          if (aiElapsedSecs) console.log(`     ✅ processed by ${opts.model} in ${aiElapsedSecs}s`);
-          console.log(extractedCode ? `     ✅ MFA code found: ${extractedCode}` : '     ❌ no code found');
-        } else {
-          console.log('     ⏭️  skipped (outside time window)');
-        }
+        if (aiWarning) console.log(`     ⚠️  ${aiWarning}`);
+        if (aiElapsedSecs) console.log(`     ✅ processed by ${opts.model} in ${aiElapsedSecs}s`);
+        console.log(extractedCode ? `     ✅ MFA code found: ${extractedCode}` : '     ❌ no code found');
       });
       if (code) {
         console.log(`\n🎉 Final result: Code ${code} extracted successfully.`);
