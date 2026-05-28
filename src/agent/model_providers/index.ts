@@ -25,7 +25,11 @@ export async function callWithTools(params: ProviderCallParams): Promise<Provide
 export async function callForText(
   model: string, userMessage: string, maxTokens = 512, modelOptions?: ModelOptions,
 ): Promise<string> {
-  if (isAnthropicModel(model)) return callAnthropicForText(model, userMessage, maxTokens);
-  if (isOpenRouterModel(model)) return callOpenRouterForText(model, userMessage, maxTokens);
+  if (isAnthropicModel(model)) {
+    return callAnthropicForText(model, userMessage, maxTokens, modelOptions);
+  }
+  if (isOpenRouterModel(model)) {
+    return callOpenRouterForText(model, userMessage, maxTokens, modelOptions);
+  }
   return callOllamaForText(model, userMessage, maxTokens, modelOptions);
 }

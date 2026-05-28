@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { TextBlock, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
 import { keychainLoadApiKey } from '../../keychain';
-import type { ProviderCallParams, ProviderResponse } from './types';
+import type { ModelOptions, ProviderCallParams, ProviderResponse } from './types';
 
 let _client: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -40,7 +40,7 @@ export async function callAnthropic(params: ProviderCallParams): Promise<Provide
 }
 
 export async function callAnthropicForText(
-  model: string, userMessage: string, maxTokens: number,
+  model: string, userMessage: string, maxTokens: number, _modelOptions?: ModelOptions,
 ): Promise<string> {
   const response = await getClient().messages.create({
     model,
