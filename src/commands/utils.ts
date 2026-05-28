@@ -235,7 +235,7 @@ export function selectFromList(
     }
   };
 
-  process.stdout.write(`\n  ${label}\n`);
+  process.stdout.write(`\n  ${label}\n\n`);
   if (header) process.stdout.write(`\x1b[4m    ${header}\x1b[0m\n`);
   render(true);
 
