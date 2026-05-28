@@ -166,9 +166,8 @@ async function searchForCode(
 
     // Verbose per-email logging only for the normal (non-test) path — the onEmailChecked
     // callback used by `config gmail-test` does its own logging, so we must not double-print.
-    if (!onEmailChecked) {
+    if (!onEmailChecked && withinWindow) {
       console.log(`  – "${subject}" from ${sender} (${ageMins}m ago)`);
-      if (!withinWindow) console.log('     ⏭️  skipped (outside time window)');
     }
 
     let extractedCode: string | null = null;

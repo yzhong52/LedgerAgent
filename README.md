@@ -27,7 +27,7 @@ npm run cli -- config anthropic
 ```bash
 npm run cli -- config openrouter
 npm run cli -- sync --model openai/gpt-4o
-npm run cli -- sync --model google/gemini-2.0-flash-001
+npm run cli -- sync --model qwen/qwen3.5-27b
 ```
 
 **Ollama** — install [Ollama](https://ollama.com), pull a model, and pass `--model` when syncing:
