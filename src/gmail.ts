@@ -9,26 +9,15 @@ import type { ModelOptions } from './agent/model_providers/types';
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS  = 60000;
 
-export interface EmailInfo {
-  sender: string;
-  subject: string;
-  date: Date;
-  extractedCode: string | null;
-  // Elapsed seconds for AI extraction (e.g. "1.2"), or null when not used.
-  // AI is only invoked for emails within the time window AND when regex extraction found no code.
-  aiElapsedSecs: string | null;
-  // Set when the AI returned a response that wasn't a valid numeric code.
-  aiWarning: string | null;
-}
 
 // since is the login start time — only accept emails that arrived after login began,
 // so codes from a previous session are never mistakenly reused.
-// Pass onEmailChecked to inspect every email scanned (used by gmail-test); also disables polling.
+// verbose prints per-email subject, sender, and extraction results; also disables poll looping.
 export async function fetchMfaCode(
   since: Date,
   model: string,
+  verbose: boolean,
   modelOptions: ModelOptions,
-  onEmailChecked?: (info: EmailInfo) => void,
 ): Promise<string | null> {
   const { gmailAddress } = await loadConfig();
   if (!gmailAddress) return null;
@@ -44,7 +33,7 @@ export async function fetchMfaCode(
     logger: false,
   });
 
-  const deadline = onEmailChecked ? 0 : Date.now() + POLL_TIMEOUT_MS;
+  const deadline = verbose ? 0 : Date.now() + POLL_TIMEOUT_MS;
 
   console.log('Checking Gmail for MFA code... ⏳');
 
@@ -59,10 +48,10 @@ export async function fetchMfaCode(
         // NOOP flushes pending server notifications so new messages appear in SEARCH
         await client.noop();
         const code = await searchForCode(
-          client, since, model, modelOptions, seenUids, onEmailChecked,
+          client, since, model, modelOptions, seenUids, verbose,
         );
         if (code) return code;
-        if (onEmailChecked) break;
+        if (verbose) break;
         if (++attempt % 5 === 0) console.log('Still waiting for MFA email... ⏳');
         await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
       } while (Date.now() < deadline);
@@ -134,7 +123,8 @@ async function searchForCode(
   model: string,
   modelOptions: ModelOptions,
   seenUids: Set<number>,
-  onEmailChecked?: (info: EmailInfo) => void,
+  // When true, prints per-email subject/sender/extraction results. Also disables poll looping.
+  verbose: boolean,
 ): Promise<string | null> {
   // IMAP SINCE is day-granular; we filter by exact internalDate after fetching
   const today = new Date();
@@ -161,13 +151,15 @@ async function searchForCode(
     const sender = fromAddr?.address ?? (fromAddr?.name || 'unknown');
     const subject = msg.envelope?.subject ?? '(no subject)';
 
-    const withinWindow = internalDate >= since;
+    const isWithinWindow = internalDate >= since;
 
-    if (!withinWindow) continue;
+    if (!isWithinWindow) continue;
 
-    // Verbose per-email logging only for the normal (non-test) path — the onEmailChecked
-    // callback used by `config gmail-test` does its own logging, so we must not double-print.
-    if (!onEmailChecked) {
+    if (verbose) {
+      const ago = ageMins < 1 ? '<1m ago' : `${ageMins}m ago`;
+      console.log(`  ✉️  ${subject} (${ago})`);
+      console.log(`     👤 from: ${sender}`);
+    } else {
       console.log(`  – "${subject}" from ${sender} (${ageMins}m ago)`);
     }
 
@@ -190,19 +182,15 @@ async function searchForCode(
       aiElapsedSecs = ((Date.now() - aiStart) / 1000).toFixed(1);
     }
 
-    if (!onEmailChecked) {
-      if (aiWarning) console.warn(`     ⚠️  ${aiWarning}`);
-      if (aiElapsedSecs) console.log(`     ✅ processed by ${model} in ${aiElapsedSecs}s`);
-      if (!extractedCode) console.log('     ❌ no code found');
+    if (aiWarning) console.warn(`     ⚠️  ${aiWarning}`);
+    if (aiElapsedSecs) console.log(`     ✅ processed by ${model} in ${aiElapsedSecs}s`);
+    if (verbose) {
+      console.log(extractedCode ? `     ✅ MFA code found: ${extractedCode}` : '     ❌ no code found');
+    } else if (!extractedCode) {
+      console.log('     ❌ no code found');
     }
 
-    if (onEmailChecked) {
-      onEmailChecked({
-        sender, subject, date: internalDate, extractedCode, aiElapsedSecs, aiWarning,
-      });
-    }
-
-    if (withinWindow && extractedCode) return extractedCode;
+    if (isWithinWindow && extractedCode) return extractedCode;
   }
 
   return null;

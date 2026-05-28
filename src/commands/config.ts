@@ -98,18 +98,8 @@ More info: faq/how_to_config_gmail_for_mfa.md
       console.log('Keychain      : password found');
       console.log('Connecting to imap.gmail.com...');
       const since = new Date(Date.now() - ms);
-      const code = await fetchMfaCode(since, opts.model, {
+      const code = await fetchMfaCode(since, opts.model, true, {
         reasoningEffort: opts.reasoningEffort,
-      }, ({
-        sender, subject, date, extractedCode, aiElapsedSecs, aiWarning,
-      }) => {
-        const ageMs = Date.now() - date.getTime();
-        const ago = ageMs < 60000 ? '<1m ago' : `${Math.round(ageMs / 60000)}m ago`;
-        console.log(`  ✉️  ${subject} (${ago})`);
-        console.log(`     👤 from: ${sender}`);
-        if (aiWarning) console.log(`     ⚠️  ${aiWarning}`);
-        if (aiElapsedSecs) console.log(`     ✅ processed by ${opts.model} in ${aiElapsedSecs}s`);
-        console.log(extractedCode ? `     ✅ MFA code found: ${extractedCode}` : '     ❌ no code found');
       });
       if (code) {
         console.log(`\n🎉 Final result: Code ${code} extracted successfully.`);

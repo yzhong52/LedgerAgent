@@ -234,7 +234,7 @@ export async function login(
             return toolResult(`typed into ${input.role} "${input.name}"`);
           case LOGIN_TOOL.REQUEST_MFA_CODE: {
             console.log(`\n${input.instructions as string}`);
-            const autoCode = await fetchMfaCode(loginStartedAt, model, modelOptions);
+            const autoCode = await fetchMfaCode(loginStartedAt, model, false, modelOptions);
             const code = autoCode ?? await promptForMfaCode();
             track('request_mfa_code', 'success');
             return toolResult(code);
