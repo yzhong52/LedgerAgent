@@ -1,10 +1,14 @@
 import type { ContentBlockParam, MessageParam, TextBlock, Tool, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
 
-export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+// Values accepted by Ollama's OpenAI-compatible endpoint.
+// Validated in: https://github.com/ollama/ollama/blob/main/openai/openai.go (search "invalid reasoning value")
+// NOTE: intentionally NOT OpenAI.Shared.ReasoningEffort — OpenAI's SDK type uses 'xhigh'/'minimal'
+// whereas Ollama uses 'max' and has no 'minimal'. Using the SDK type directly caused 400 errors.
+export const REASONING_EFFORTS = [
+  'none', 'low', 'medium', 'high', 'max',
+] as const;
 
-export const REASONING_EFFORTS: ReasoningEffort[] = [
-  'none', 'minimal', 'low', 'medium', 'high', 'xhigh',
-];
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export interface ModelOptions {
   reasoningEffort?: ReasoningEffort;
