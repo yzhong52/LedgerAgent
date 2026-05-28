@@ -30,7 +30,7 @@ export function makeSyncCommand(): Command {
     .option('--skip-transactions', 'Skip transaction fetch; only sync accounts')
     .option('-v, --verbose', 'Show accessibility snapshots in the terminal')
     .option('--demo', 'Hide sensitive data by randomizing balances and account numbers')
-    .option('--model <id>', 'Model ID to use — Claude (claude-*) or Ollama (e.g. qwen3.5:9b)', DEFAULT_MODEL)
+    .option('--model <id>', 'Model ID: Anthropic (claude-*), OpenRouter (provider/model e.g. openai/gpt-4o), or Ollama (e.g. qwen3.5:9b)', DEFAULT_MODEL)
     .option(
       '--reasoning-effort <level>',
       `Reasoning effort for Ollama/OpenAI-compatible models: ${REASONING_EFFORTS.join(', ')}`,

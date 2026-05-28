@@ -1,6 +1,8 @@
 import { spawnSync } from 'child_process';
 
 const SERVICE = 'ledgeragent';
+const ANTHROPIC_ACCOUNT = 'anthropic-api-key';
+const OPENROUTER_ACCOUNT = 'openrouter-api-key';
 
 // Account key includes the institution name to avoid collisions when the
 // same email is used at multiple institutions.
@@ -30,9 +32,6 @@ export function keychainLoad(name: string, email: string): string | null {
   if (result.status !== 0) return null;
   return result.stdout.toString().trim();
 }
-
-const ANTHROPIC_ACCOUNT = 'anthropic-api-key';
-const OPENROUTER_ACCOUNT = 'openrouter-api-key';
 
 export function keychainSaveApiKey(key: string): void {
   const result = spawnSync('security', [

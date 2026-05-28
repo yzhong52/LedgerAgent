@@ -65,7 +65,7 @@ More info: faq/how_to_config_gmail_for_mfa.md
     .command('gmail-test')
     .description('Test Gmail IMAP connection and search recent emails for MFA codes')
     .option('--since <duration>', 'how far back to search (e.g. 5m, 30m, 1h)', '5m')
-    .option('--model <id>', 'Model ID to use for extraction', DEFAULT_MODEL)
+    .option('--model <id>', 'Model ID: Anthropic (claude-*), OpenRouter (provider/model e.g. openai/gpt-4o), or Ollama (e.g. qwen3.5:9b)', DEFAULT_MODEL)
     .option(
       '--reasoning-effort <level>',
       `Reasoning effort for Ollama/OpenAI-compatible models: ${REASONING_EFFORTS.join(', ')}`,

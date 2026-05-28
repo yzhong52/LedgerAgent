@@ -14,12 +14,20 @@ npm install
 npx playwright install chromium
 ```
 
-**Choose a model provider** — LedgerAgent supports Anthropic Claude (default) or a locally-running Ollama model:
+**Choose a model provider** — LedgerAgent supports Anthropic Claude (default), [OpenRouter](https://openrouter.ai), or a locally-running Ollama model:
 
 **Anthropic (default)** — save your API key to Keychain:
 
 ```bash
 npm run cli -- config anthropic
+```
+
+**OpenRouter** — access any cloud model (OpenAI, Google, Meta, etc.) through a single API key. Model IDs use the `provider/model` format:
+
+```bash
+npm run cli -- config openrouter
+npm run cli -- sync --model openai/gpt-4o
+npm run cli -- sync --model google/gemini-2.0-flash-001
 ```
 
 **Ollama** — install [Ollama](https://ollama.com), pull a model, and pass `--model` when syncing:
@@ -138,7 +146,8 @@ npm run cli -- config gmail-test --since 30m
 
 ## Troubleshooting
 
-- If you see an Anthropic authentication error, run `npm run cli -- config anthropic` to save your API key to Keychain (not needed when using Ollama).
+- If you see an Anthropic authentication error, run `npm run cli -- config anthropic` to save your API key to Keychain (not needed when using Ollama or OpenRouter).
+- If you see an OpenRouter authentication error, run `npm run cli -- config openrouter` to save your API key to Keychain, or set the `OPENROUTER_API_KEY` environment variable.
 - If browser launch fails, make sure Google Chrome is installed and `npx playwright install chromium` has been run.
 - If MFA auto-fill does not work, run `npm run cli -- config gmail` and verify the Gmail App Password.
 - If a login flow breaks after an institution changes its UI, inspect the saved accessibility snapshots in `~/.ledgeragent/logs/`. Sessions are grouped into timestamp-first subfolders named with the institution (e.g. `2025-05-28_143022_123_wealthsimple/`). The 20 most recent sessions overall are kept automatically.
@@ -149,4 +158,4 @@ npm run cli -- config gmail-test --since 30m
 - Node.js 18+
 - macOS (Keychain is used for credential storage)
 - Google Chrome
-- Anthropic API key **or** [Ollama](https://ollama.com) running locally
+- Anthropic API key, [OpenRouter](https://openrouter.ai) API key, **or** [Ollama](https://ollama.com) running locally
