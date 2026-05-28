@@ -2,7 +2,7 @@ export type { ProviderCallParams, ProviderResponse } from './types';
 
 import { callAnthropic, callAnthropicForText } from './anthropic';
 import { callOllama, callOllamaForText } from './ollama';
-import type { ProviderCallParams, ProviderResponse } from './types';
+import type { ModelOptions, ProviderCallParams, ProviderResponse } from './types';
 
 export const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -19,8 +19,8 @@ export async function callWithTools(params: ProviderCallParams): Promise<Provide
 }
 
 export async function callForText(
-  model: string, userMessage: string, maxTokens?: number,
+  model: string, userMessage: string, maxTokens = 512, modelOptions?: ModelOptions,
 ): Promise<string> {
   if (isAnthropicModel(model)) return callAnthropicForText(model, userMessage, maxTokens);
-  return callOllamaForText(model, userMessage, maxTokens);
+  return callOllamaForText(model, userMessage, maxTokens, modelOptions);
 }

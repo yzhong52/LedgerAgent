@@ -3,6 +3,7 @@ import type { Tool } from '@anthropic-ai/sdk/resources/messages';
 import { runAgent, toolDone, toolResult, SEPARATOR } from '../agent';
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
 import { TRANSACTION_TOOL, DONE_TOOL, DONE_TOOL_DEF } from '../agent/tools';
+import type { ModelOptions } from '../agent/model_providers/types';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
   generateSessionNotes, type ToolEvent,
@@ -118,6 +119,7 @@ export async function fetchTransactions(
   lookbackDays: number,
   sessionDir: string,
   model: string,
+  modelOptions: ModelOptions,
 ): Promise<Transaction[]> {
   console.log(SEPARATOR);
   console.log(`🤖 Fetching transactions for ${account.name}... ⏳`);
@@ -177,6 +179,7 @@ export async function fetchTransactions(
       MAX_TURNS,
       8192,
       model,
+      modelOptions,
     );
   } finally {
     if (events.length > 0) {
@@ -186,6 +189,7 @@ export async function fetchTransactions(
         `fetching transactions for account "${account.name}" at ${institutionName}`,
         model,
         notes,
+        modelOptions,
       );
       await saveMemoryNotes(institutionName, MEMORY_TASK, sessionNotes);
     }

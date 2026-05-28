@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DATA_DIR } from './db';
 import { callForText } from './agent/model_providers';
+import type { ModelOptions } from './agent/model_providers/types';
 
 export interface ToolEvent {
   description: string;
@@ -114,6 +115,7 @@ export function formatMemoryForPrompt(notes: string, task: string): string {
 
 export async function generateSessionNotes(
   events: ToolEvent[], taskContext: string, model: string, previousNotes: string = '',
+  modelOptions: ModelOptions,
 ): Promise<string> {
   if (events.length === 0) return '';
 
@@ -137,6 +139,8 @@ Keep what is still accurate, correct anything this session proves wrong, and add
 Be specific about Playwright tool names, data-testid values, ARIA roles, and element names.
 Do NOT include ARIA ref IDs (e.g. [ref=e42]) — they change every session and are useless in notes.
 Do not include a heading — start directly with the bullet points.`,
+    512,
+    modelOptions,
   );
 
   return normalizeNotes(text);

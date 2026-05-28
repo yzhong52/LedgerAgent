@@ -17,6 +17,12 @@ function briefInput(input: Record<string, unknown>): string {
   return '';
 }
 
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = ms / 1000;
+  return `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)}s`;
+}
+
 function sessionTimestamp(folderName: string): string | null {
   const timestampFirst = folderName.match(/^(\d{4}-\d{2}-\d{2}_\d{6}(?:_\d{3})?)_/);
   if (timestampFirst) return timestampFirst[1];
@@ -75,14 +81,16 @@ export function logToolUse(
   name: string,
   input: Record<string, unknown>,
   redactSensitive: (text: string) => string,
+  durationMs: number,
 ): void {
+  const duration = ` (${formatDuration(durationMs)})`;
   if (name === SUCCESS_TOOL) {
-    console.log(`🔄 ${turn + 1}/${maxTurns} 💬 Mission accomplished`);
+    console.log(`🔄 ${turn + 1}/${maxTurns} 💬 Mission accomplished${duration}`);
   } else if (VERBOSE) {
-    console.log(`🔄 ${turn + 1}/${maxTurns} 💬 ${name}`, redactSensitive(JSON.stringify(input)));
+    console.log(`🔄 ${turn + 1}/${maxTurns} 💬 ${name}${duration}`, redactSensitive(JSON.stringify(input)));
   } else {
     const brief = briefInput(input);
-    console.log(`🔄 ${turn + 1}/${maxTurns} 💬 ${name}${brief ? ` ${brief}` : ''}`);
+    console.log(`🔄 ${turn + 1}/${maxTurns} 💬 ${name}${brief ? ` ${brief}` : ''}${duration}`);
   }
 }
 

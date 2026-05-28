@@ -4,6 +4,7 @@ import { convert as htmlToText } from 'html-to-text';
 import { keychainLoad } from './keychain';
 import { loadConfig } from './config';
 import { callForText } from './agent/model_providers';
+import type { ModelOptions } from './agent/model_providers/types';
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS  = 60000;
@@ -13,6 +14,9 @@ export interface EmailInfo {
   subject: string;
   date: Date;
   extractedCode: string | null;
+  // Elapsed seconds for AI extraction (e.g. "1.2"), or null when not used.
+  // AI is only invoked for emails within the time window AND when regex extraction found no code.
+  aiElapsedSecs: string | null;
 }
 
 // since is the login start time — only accept emails that arrived after login began,
@@ -21,6 +25,7 @@ export interface EmailInfo {
 export async function fetchMfaCode(
   since: Date,
   model: string,
+  modelOptions: ModelOptions,
   onEmailChecked?: (info: EmailInfo) => void,
 ): Promise<string | null> {
   const { gmailAddress } = await loadConfig();
@@ -51,7 +56,9 @@ export async function fetchMfaCode(
       do {
         // NOOP flushes pending server notifications so new messages appear in SEARCH
         await client.noop();
-        const code = await searchForCode(client, since, model, seenUids, onEmailChecked);
+        const code = await searchForCode(
+          client, since, model, modelOptions, seenUids, onEmailChecked,
+        );
         if (code) return code;
         if (onEmailChecked) break;
         if (++attempt % 5 === 0) console.log('Still waiting for MFA email... ⏳');
@@ -72,7 +79,11 @@ export async function fetchMfaCode(
 const VALID_CODE_RE = /^\d{4,8}$/;
 const ALL_SAME_DIGIT_RE = /^(\d)\1+$/;
 
-async function extractMfaCodeAI(cleanedText: string, model: string): Promise<string | null> {
+async function extractMfaCodeAI(
+  cleanedText: string,
+  model: string,
+  modelOptions: ModelOptions,
+): Promise<string | null> {
   try {
     const response = await callForText(
       model,
@@ -82,6 +93,7 @@ If there is no verification code, reply with exactly: none
 Email:
 ${cleanedText}`,
       20,
+      modelOptions,
     );
     const code = response.trim();
     if (!code || code.toLowerCase() === 'none') return null;
@@ -117,6 +129,7 @@ async function searchForCode(
   client: ImapFlow,
   since: Date,
   model: string,
+  modelOptions: ModelOptions,
   seenUids: Set<number>,
   onEmailChecked?: (info: EmailInfo) => void,
 ): Promise<string | null> {
@@ -140,10 +153,23 @@ async function searchForCode(
     seenUids.add(msg.uid);
 
     const internalDate = new Date(msg.internalDate);
+    const ageMins = Math.round((Date.now() - internalDate.getTime()) / 60000);
+    const fromAddr = msg.envelope?.from?.[0];
+    const sender = fromAddr?.address ?? (fromAddr?.name || 'unknown');
+    const subject = msg.envelope?.subject ?? '(no subject)';
+
     const withinWindow = internalDate >= since;
     const shouldExtract = onEmailChecked || withinWindow;
 
+    // Verbose per-email logging only for the normal (non-test) path — the onEmailChecked
+    // callback used by `config gmail-test` does its own logging, so we must not double-print.
+    if (!onEmailChecked) {
+      console.log(`  – "${subject}" from ${sender} (${ageMins}m ago)`);
+      if (!withinWindow) console.log('     ⏭️  skipped (outside time window)');
+    }
+
     let extractedCode: string | null = null;
+    let aiElapsedSecs: string | null = null;
     if (shouldExtract) {
       const rawSource = msg.source.toString();
       const parsed = await simpleParser(rawSource);
@@ -156,19 +182,19 @@ async function searchForCode(
       extractedCode = extractMfaCode(cleaned);
       // Only call AI for emails within the time window — avoids unnecessary API costs in test mode.
       if (extractedCode === null && withinWindow) {
-        extractedCode = await extractMfaCodeAI(cleaned, model);
+        const aiStart = Date.now();
+        extractedCode = await extractMfaCodeAI(cleaned, model, modelOptions);
+        aiElapsedSecs = ((Date.now() - aiStart) / 1000).toFixed(1);
+      }
+
+      if (!onEmailChecked && withinWindow) {
+        if (aiElapsedSecs) console.log(`     ✅ processed by ${model} in ${aiElapsedSecs}s`);
+        if (!extractedCode) console.log('     ❌ no code found');
       }
     }
 
     if (onEmailChecked) {
-      const fromAddr = msg.envelope?.from?.[0];
-      const sender = fromAddr?.address ?? (fromAddr?.name || 'unknown');
-      onEmailChecked({
-        sender,
-        subject: msg.envelope?.subject ?? '(no subject)',
-        date: internalDate,
-        extractedCode,
-      });
+      onEmailChecked({ sender, subject, date: internalDate, extractedCode, aiElapsedSecs });
     }
 
     if (withinWindow && extractedCode) return extractedCode;
