@@ -28,8 +28,8 @@ Login flow:
      Use fill_password (or type_password for fields that require key events) to enter the
      password, then submit the form.
   3. If a page asks you to choose how to receive a verification code (e.g. text, call, email),
-     prefer the email option if one is available, select it, then click the Continue/Send/Next
-     button to trigger delivery before calling request_mfa_code.
+     prefer email first, then text — never choose call. Select the preferred option and click
+     the Continue/Send/Next button to trigger delivery before calling request_mfa_code.
   4. If a multi-factor authentication (MFA) or verification code screen appears,
      call request_mfa_code with a short description of what the user should do.
      The tool returns the code — use the type tool (not fill) to enter it, then submit.
