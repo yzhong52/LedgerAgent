@@ -33,7 +33,7 @@ export function makeSyncCommand(): Command {
     .option('--model <id>', 'Model ID to use — Claude (claude-*) or Ollama (e.g. qwen3.5:9b)', DEFAULT_MODEL)
     .option(
       '--reasoning-effort <level>',
-      'Reasoning effort for Ollama/OpenAI-compatible models: none, minimal, low, medium, high, xhigh',
+      `Reasoning effort for Ollama/OpenAI-compatible models: ${REASONING_EFFORTS.join(', ')}`,
       'none',
     )
     .action(async (opts: {

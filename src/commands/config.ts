@@ -64,7 +64,7 @@ More info: faq/how_to_config_gmail_for_mfa.md
     .option('--model <id>', 'Model ID to use for extraction', DEFAULT_MODEL)
     .option(
       '--reasoning-effort <level>',
-      'Reasoning effort for Ollama/OpenAI-compatible models: none, minimal, low, medium, high, xhigh',
+      `Reasoning effort for Ollama/OpenAI-compatible models: ${REASONING_EFFORTS.join(', ')}`,
       'none',
     )
     .action(async (opts: { since: string; model: string; reasoningEffort: string }) => {

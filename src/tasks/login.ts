@@ -234,13 +234,8 @@ export async function login(
             return toolResult(`typed into ${input.role} "${input.name}"`);
           case LOGIN_TOOL.REQUEST_MFA_CODE: {
             console.log(`\n${input.instructions as string}`);
-            const code = await fetchMfaCode(loginStartedAt, model, modelOptions)
-              ?? (await promptUser(
-                '\n💡 Did you know you can forward text messages to email?\n' +
-                '   Android: https://github.com/yzhong52/auto-relay\n' +
-                '   iOS:     https://yzhong52.github.io/auto-relay/faq/setting-up-for-ios.html\n\n' +
-                'Please enter your code here: ',
-              )).trim();
+            const autoCode = await fetchMfaCode(loginStartedAt, model, modelOptions);
+            const code = autoCode ?? await promptForMfaCode();
             track('request_mfa_code', 'success');
             return toolResult(code);
           }
@@ -300,4 +295,13 @@ export async function login(
 function promptUser(question: string): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise(resolve => rl.question(question, ans => { rl.close(); resolve(ans); }));
+}
+
+async function promptForMfaCode(): Promise<string> {
+  return (await promptUser(
+    '\n💡 Did you know you can forward text messages to email?\n' +
+    '   Android: https://github.com/yzhong52/auto-relay\n' +
+    '   iOS:     https://yzhong52.github.io/auto-relay/faq/setting-up-for-ios.html\n\n' +
+    'Please enter your code here: ',
+  )).trim();
 }
