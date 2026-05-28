@@ -228,7 +228,7 @@ export function selectFromList(
       if (skipIndices.has(i)) {
         process.stdout.write(`\x1b[2K\x1b[2m    ${items[i]}\x1b[0m\n`);
       } else if (i === selected) {
-        process.stdout.write(`\x1b[2K\x1b[7m  > ${items[i]}\x1b[0m\n`);
+        process.stdout.write(`\x1b[2K  \x1b[36m❯\x1b[0m \x1b[1m${items[i]}\x1b[0m\n`);
       } else {
         process.stdout.write(`\x1b[2K    ${items[i]}\n`);
       }
