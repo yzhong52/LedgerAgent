@@ -83,6 +83,8 @@ export function makeSyncCommand(): Command {
         if (idx > 0) institutions = [institutions[idx - 1]];
         opts.skipTransactions = !(await confirm('Sync transactions?'));
         opts.skipHoldings = !(await confirm('Sync holdings?'));
+        const modelInput = await prompt(`\n  Model (${opts.model}): `);
+        if (modelInput.trim()) opts.model = modelInput.trim();
       } else if (opts.institution) {
         const filter = opts.institution.toLowerCase();
         institutions = institutions.filter(i => i.name.toLowerCase() === filter);
