@@ -1,5 +1,9 @@
 import { Command } from 'commander';
-import { keychainSave, keychainLoad, keychainSaveApiKey, keychainLoadApiKey } from '../keychain';
+import {
+  keychainSave, keychainLoad,
+  keychainSaveApiKey, keychainLoadApiKey,
+  keychainSaveOpenRouterApiKey, keychainLoadOpenRouterApiKey,
+} from '../keychain';
 import { loadConfig, saveConfig } from '../config';
 import { fetchMfaCode } from '../gmail';
 import { DEFAULT_MODEL } from '../agent/model_providers';
@@ -136,6 +140,26 @@ More info: faq/how_to_config_gmail_for_mfa.md
       }
       keychainSaveApiKey(newKey);
       console.log('Saved Anthropic API key to Keychain.');
+    });
+
+  cmd
+    .command('openrouter')
+    .description('Save OpenRouter API key to Keychain')
+    .action(async () => {
+      const existingKey = keychainLoadOpenRouterApiKey() ?? '';
+      const maskedKey = existingKey.length >= 2
+        ? existingKey[0] + '*'.repeat(existingKey.length - 2) + existingKey.at(-1)
+        : existingKey ? '*'.repeat(existingKey.length) : '';
+      const keyInput = await promptPassword(
+        maskedKey ? `OpenRouter API key [${maskedKey}]: ` : 'OpenRouter API key (sk-or-...): ',
+      );
+      const newKey = keyInput.trim() || existingKey;
+      if (!newKey) {
+        console.log('Aborted — API key is required.');
+        return;
+      }
+      keychainSaveOpenRouterApiKey(newKey);
+      console.log('Saved OpenRouter API key to Keychain.');
     });
 
   return cmd;
