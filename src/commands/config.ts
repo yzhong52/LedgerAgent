@@ -101,14 +101,15 @@ More info: faq/how_to_config_gmail_for_mfa.md
       const code = await fetchMfaCode(since, opts.model, {
         reasoningEffort: opts.reasoningEffort,
       }, ({
-        sender, subject, date, extractedCode, aiElapsedSecs,
+        sender, subject, date, extractedCode, aiElapsedSecs, aiWarning,
       }) => {
         const ageMs = Date.now() - date.getTime();
         const ago = ageMs < 60000 ? '<1m ago' : `${Math.round(ageMs / 60000)}m ago`;
         const withinWindow = date >= since;
-        const marker = withinWindow ? '-' : '–';
-        console.log(`  ${marker} "${subject}" from ${sender} (${ago})`);
+        console.log(`  ✉️  ${subject} (${ago})`);
+        console.log(`     from: ${sender}`);
         if (withinWindow) {
+          if (aiWarning) console.log(`     ⚠️  ${aiWarning}`);
           if (aiElapsedSecs) console.log(`     ✅ processed by ${opts.model} in ${aiElapsedSecs}s`);
           console.log(extractedCode ? `     ✅ MFA code found: ${extractedCode}` : '     ❌ no code found');
         } else {

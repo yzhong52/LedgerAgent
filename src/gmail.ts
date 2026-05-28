@@ -17,6 +17,8 @@ export interface EmailInfo {
   // Elapsed seconds for AI extraction (e.g. "1.2"), or null when not used.
   // AI is only invoked for emails within the time window AND when regex extraction found no code.
   aiElapsedSecs: string | null;
+  // Set when the AI returned a response that wasn't a valid numeric code.
+  aiWarning: string | null;
 }
 
 // since is the login start time — only accept emails that arrived after login began,
@@ -83,7 +85,7 @@ async function extractMfaCodeAI(
   cleanedText: string,
   model: string,
   modelOptions: ModelOptions,
-): Promise<string | null> {
+): Promise<{ code: string | null; warning: string | null }> {
   try {
     const response = await callForText(
       model,
@@ -96,15 +98,16 @@ ${cleanedText}`,
       modelOptions,
     );
     const code = response.trim();
-    if (!code || code.toLowerCase() === 'none') return null;
+    if (!code || code.toLowerCase() === 'none') return { code: null, warning: null };
     if (!VALID_CODE_RE.test(code)) {
-      console.warn(`AI returned unexpected MFA code format: "${code}"`);
-      return null;
+      return { code: null, warning: `AI returned unexpected MFA code format: "${code}"` };
     }
-    return code;
+    return { code, warning: null };
   } catch (err) {
-    console.warn(`AI MFA extraction failed: ${err instanceof Error ? err.message : err}`);
-    return null;
+    return {
+      code: null,
+      warning: `AI MFA extraction failed: ${err instanceof Error ? err.message : err}`,
+    };
   }
 }
 
@@ -170,6 +173,7 @@ async function searchForCode(
 
     let extractedCode: string | null = null;
     let aiElapsedSecs: string | null = null;
+    let aiWarning: string | null = null;
     if (shouldExtract) {
       const rawSource = msg.source.toString();
       const parsed = await simpleParser(rawSource);
@@ -183,18 +187,23 @@ async function searchForCode(
       // Only call AI for emails within the time window — avoids unnecessary API costs in test mode.
       if (extractedCode === null && withinWindow) {
         const aiStart = Date.now();
-        extractedCode = await extractMfaCodeAI(cleaned, model, modelOptions);
+        ({ code: extractedCode, warning: aiWarning } = await extractMfaCodeAI(
+          cleaned, model, modelOptions,
+        ));
         aiElapsedSecs = ((Date.now() - aiStart) / 1000).toFixed(1);
       }
 
       if (!onEmailChecked && withinWindow) {
+        if (aiWarning) console.warn(`     ⚠️  ${aiWarning}`);
         if (aiElapsedSecs) console.log(`     ✅ processed by ${model} in ${aiElapsedSecs}s`);
         if (!extractedCode) console.log('     ❌ no code found');
       }
     }
 
     if (onEmailChecked) {
-      onEmailChecked({ sender, subject, date: internalDate, extractedCode, aiElapsedSecs });
+      onEmailChecked({
+        sender, subject, date: internalDate, extractedCode, aiElapsedSecs, aiWarning,
+      });
     }
 
     if (withinWindow && extractedCode) return extractedCode;
