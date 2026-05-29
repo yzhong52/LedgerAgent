@@ -50,12 +50,8 @@ function pageStateMessage(snap: string, url: string): { type: 'text'; text: stri
   return { type: 'text', text: `Current page state:\nURL: ${url}\n\n${snap}` };
 }
 
-// Wait for the page to settle before snapshotting. Without this, a snapshot taken
-// immediately after a click (e.g. clicking Log In) captures the pre-navigation DOM
-// because domcontentloaded fires before the new page finishes rendering — causing the
-// agent to see the login page again and incorrectly infer that MFA is needed.
-// 8s covers slow SPA login API calls (e.g. Wealthsimple); if the page stays busy
-// past that we snapshot anyway rather than blocking indefinitely.
+// Waits for the page to settle, then polls until the DOM stabilises before snapshotting.
+// See inline comments below for the rationale behind each wait.
 async function takeSnapshot(
   page: Page,
   snapshotsDir: string,
@@ -63,22 +59,43 @@ async function takeSnapshot(
   snapCount: number,
   redactSensitive: (text: string) => string,
 ): Promise<{ snap: string; snapFile: string; url: string }> {
+  const startMs = Date.now();
+  // First wait: block until no network requests for 500ms (Playwright's networkidle definition).
+  // Catches in-flight XHR/fetch from the triggering click before we read the DOM.
   await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+
+  const ariaSnap = () => page.locator('body').ariaSnapshot({ mode: 'ai' });
+
+  // ariaSnapshot can transiently fail mid-navigation; retry a few times before giving up.
   let snap: string | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      snap = await page.locator('body').ariaSnapshot({ mode: 'ai' });
+      snap = await ariaSnap();
       break;
     } catch {
       if (attempt < 2) await new Promise(r => setTimeout(r, 500));
     }
   }
   if (snap === null) throw new Error('Could not snapshot page after 3 attempts');
+
+  // Second wait: poll until two consecutive snapshots are identical, which signals that
+  // lazily-rendered content (e.g. balance figures fetched after page load) has settled.
+  // Each financial institution behaves differently, so we use DOM stability as a
+  // institution-agnostic proxy rather than waiting on a known element.
+  const STABILITY_INTERVAL_MS = 2000;
+  const STABILITY_DEADLINE = Date.now() + 15000;
+  while (Date.now() < STABILITY_DEADLINE) {
+    await new Promise(r => setTimeout(r, STABILITY_INTERVAL_MS));
+    const next = await ariaSnap().catch(() => null);
+    if (next === null || next === snap) break; // stable or page closed
+    snap = next;
+  }
+
   snap = redactSensitive(snap);
   const url = page.url();
   const snapFile = `${snapshotsDir}/${snapPrefix}_${String(snapCount).padStart(3, '0')}.txt`;
   await fs.writeFile(snapFile, `URL: ${url}\n\n${snap}`);
-  logSnapshot(snap, snapFile);
+  logSnapshot(snap, snapFile, Date.now() - startMs);
   return { snap, snapFile, url };
 }
 

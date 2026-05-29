@@ -118,7 +118,7 @@ export function makeSyncCommand(): Command {
       };
 
       const syncHoldings = async (page: Page, inst: Institution, sessionDir: string) => {
-        console.log(`\n  📈 Holdings`);
+        console.log(`\n  📋 Holdings`);
         const investmentAccounts = listAccounts(db).filter(
           a =>
             a.institutionName === inst.name &&
@@ -139,7 +139,7 @@ export function makeSyncCommand(): Command {
       const syncTransactions = async (page: Page, inst: Institution, sessionDir: string) => {
         const parsed = parseInt(opts.days, 10);
         const lookbackDays = Number.isNaN(parsed) ? 30 : Math.max(1, parsed);
-        console.log(`\n  💳 Transactions (last ${lookbackDays} days)`);
+        console.log(`\n  📋 Transactions (last ${lookbackDays} days)`);
         let accountsToSync: { name: string; accountId: string }[];
         if (opts.accountId) {
           const match = listAccounts(db).find(
@@ -197,6 +197,7 @@ export function makeSyncCommand(): Command {
 
           console.log(`\n🤖 Syncing ${inst.name}... ⏳`);
           const sessionDir = await createSession(inst.name);
+          console.log(`\n  📋 Login`);
           const loggedIn = await login(
             page, inst.url,
             { username: inst.username, password },

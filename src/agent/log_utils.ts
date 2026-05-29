@@ -68,12 +68,13 @@ export async function createSession(institutionName: string): Promise<string> {
   return sessionDir;
 }
 
-export function logSnapshot(snap: string, snapFile: string): void {
+export function logSnapshot(snap: string, snapFile: string, elapsedMs: number): void {
+  const duration = `${(elapsedMs / 1000).toFixed(1)}s`;
   if (VERBOSE) {
     const preview = snap.length > 240 ? snap.slice(0, 240) + '…' : snap;
-    console.log(`📸 Snapshot:\n${preview}\nFull: ${snapFile}`);
+    console.log(`📸 Snapshot (${duration}):\n${preview}\nFull: ${snapFile}`);
   } else {
-    console.log(`📸 Snapshot`);
+    console.log(`📸 Snapshot (${duration})`);
   }
 }
 
