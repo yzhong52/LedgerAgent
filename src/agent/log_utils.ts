@@ -9,6 +9,8 @@ const MAX_LOG_SESSIONS = 20;
 
 function briefInput(input: Record<string, unknown>): string {
   if (input.role && input.name) return `${input.role} "${input.name}"`;
+  if (input.ref && input.value) return `[ref=${input.ref}] "${input.value}"`;
+  if (input.ref) return `[ref=${input.ref}]`;
   if (input.testId) return `#${input.testId}`;
   if (input.text) return `"${input.text}"`;
   if (input.selector) return `"${input.selector}"`;
