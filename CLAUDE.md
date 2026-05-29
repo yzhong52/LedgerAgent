@@ -117,6 +117,8 @@ LedgerAgent keeps lightweight per-institution memory so the agent can carry forw
 
 **What gets filtered out:** Empty summaries are discarded, and obviously bad summaries such as "please provide session data" are dropped instead of being saved back into memory.
 
+**Do not edit memory files manually.** Institution memory in `~/.ledgeragent/memory/` is owned by the sync command — it is written by `generateSessionNotes()` after each successful task run. Manually editing these files will be overwritten on the next sync. If the agent is behaving incorrectly for an institution, fix the underlying code or prompts, then let a real sync run produce accurate notes.
+
 ## Adding a new institution
 
 Run `npm run cli -- institution add`. The login agent is institution-agnostic — no code changes needed unless the site has unusual behaviour (e.g. non-standard OTP fields). Check saved snapshots in `~/.ledgeragent/logs/` to see what the agent observed.
