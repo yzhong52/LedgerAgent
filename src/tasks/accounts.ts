@@ -7,6 +7,7 @@ import {
 import { BROWSER_TOOL, BROWSER_TOOLS, executeBrowserTool } from '../agent/browser';
 import { ACCOUNT_TOOL } from '../agent/tools';
 import type { ModelOptions } from '../agent/model_providers/types';
+import { callForText } from '../agent/model_providers';
 import {
   loadMemoryNotes, saveMemoryNotes, formatMemoryForPrompt,
   generateSessionNotes, type ToolEvent,
@@ -202,6 +203,54 @@ async function handleAccountToolCall(
   return toolResult(await executeBrowserTool(name, input, pg));
 }
 
+async function resolveAccountIds(
+  discovered: Account[],
+  existing: ExistingAccountHint[],
+  model: string,
+  modelOptions: ModelOptions,
+): Promise<Account[]> {
+  const withIds = existing.filter(e => e.institutionAccountId);
+  if (withIds.length === 0) return discovered;
+
+  const existingList = existing
+    .map((e, i) => `${i}: "${e.name}"${e.institutionAccountId ? ` (ID: ${e.institutionAccountId})` : ' (no ID)'}`)
+    .join('\n');
+  const discoveredList = discovered
+    .map((a, i) => `${i}: "${a.name}"${a.accountId ? ` (ID: ${a.accountId})` : ' (no ID)'}`)
+    .join('\n');
+
+  const prompt = `\
+You are reconciling newly discovered bank accounts against existing database records to prevent duplicates.
+
+Existing accounts in database:
+${existingList}
+
+Newly discovered accounts:
+${discoveredList}
+
+For each discovered account (by index), find its best match among the existing accounts by name.
+Names may differ slightly in spacing, emoji, capitalisation, or phrasing but still refer to the same account.
+Return a JSON array with exactly ${discovered.length} entries — one per discovered account, in order:
+[{"existingId": "id-or-null"}, ...]
+Set "existingId" to the matching existing account's ID, or null if the account is genuinely new.
+Return ONLY valid JSON, no other text.`;
+
+  try {
+    const raw = await callForText(model, prompt, 512, modelOptions);
+    const cleaned = raw.replace(/^```[^\n]*\n?/, '').replace(/\n?```$/, '').trim();
+    const matches: { existingId: string | null }[] = JSON.parse(cleaned);
+    if (!Array.isArray(matches) || matches.length !== discovered.length) return discovered;
+    return discovered.map((account, i) => {
+      const existingId = matches[i]?.existingId;
+      return existingId && typeof existingId === 'string'
+        ? { ...account, accountId: existingId }
+        : account;
+    });
+  } catch {
+    return discovered;
+  }
+}
+
 export async function exploreAccounts(
   page: Page,
   institutionName: string,
@@ -222,7 +271,7 @@ export async function exploreAccounts(
   try {
     const handleToolCall = handleAccountToolCall.bind(null, { track });
 
-    return await runAgent<Account[]>(
+    const accounts = await runAgent<Account[]>(
       page,
       TOOLS,
       buildSystemPrompt(notes, existingAccounts),
@@ -235,6 +284,11 @@ export async function exploreAccounts(
       model,
       modelOptions,
     );
+    if (existingAccounts.length > 0) {
+      console.log('🤖 Resolving account IDs... ⏳');
+      return await resolveAccountIds(accounts, existingAccounts, model, modelOptions);
+    }
+    return accounts;
   } finally {
     if (events.length > 0) {
       console.log('🤖 Summarizing session... ⏳');

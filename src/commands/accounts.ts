@@ -12,6 +12,7 @@ function accountLabels(
     return {
       institution: row.institutionName,
       name:        row.accountName,
+      id:          row.accountId,
       type:        row.accountType ?? '—',
       category:    row.accountCategory ?? '—',
       balance:     row.accountCurrency && bal !== '—' ? `${row.accountCurrency} ${bal}` : bal,
@@ -21,6 +22,7 @@ function accountLabels(
   const w = {
     institution: showInstitution ? Math.max('Institution'.length, ...items.map(i => i.institution.length)) : 0,
     name:        Math.max('Account'.length,     ...items.map(i => i.name.length)),
+    id:          Math.max('ID'.length, ...items.map(i => i.id.length)),
     type:        Math.max('Type'.length,        ...items.map(i => i.type.length)),
     category:    Math.max('Category'.length,    ...items.map(i => i.category.length)),
     balance:     Math.max('Balance'.length,     ...items.map(i => i.balance.length)),
@@ -29,6 +31,7 @@ function accountLabels(
   const header = [
     showInstitution ? 'Institution'.padEnd(w.institution) : null,
     'Account'.padEnd(w.name),
+    'ID'.padEnd(w.id),
     'Type'.padEnd(w.type),
     'Category'.padEnd(w.category),
     'Balance'.padStart(w.balance),
@@ -37,6 +40,7 @@ function accountLabels(
   const labels = items.map(i => [
     showInstitution ? i.institution.padEnd(w.institution) : null,
     i.name.padEnd(w.name),
+    i.id.padEnd(w.id),
     i.type.padEnd(w.type),
     i.category.padEnd(w.category),
     i.balance.padStart(w.balance),
