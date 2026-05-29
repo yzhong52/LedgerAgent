@@ -17,6 +17,7 @@ export const BROWSER_TOOL = {
   SNAPSHOT:        'snapshot',
   FRAME_SNAPSHOT:  'frame_snapshot',
   GET_INPUTS:      'get_inputs',
+  GET_INNER_TEXT:  'get_inner_text',
   CLICK:           'click',
   CLICK_TESTID:    'click_testid',
   CLICK_TEXT:      'click_text',

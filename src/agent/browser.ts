@@ -87,6 +87,18 @@ export const BROWSER_TOOLS: Tool[] = [
     },
   },
   {
+    name: BROWSER_TOOL.GET_INNER_TEXT,
+    description: 'Return the visible rendered text of a DOM element by CSS selector — captures text that has no ARIA label and is therefore absent from the aria snapshot. Use when a value you need (e.g. a balance or label) is visible on screen but missing from the snapshot. Targets the first matching element; use a specific selector to avoid returning the entire page.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        selector: { type: 'string', description: 'CSS selector for the container element, e.g. "main", "[class*=\'balance\']"' },
+        frame:    { type: 'string', description: 'CSS selector for the containing iframe, if any' },
+      },
+      required: ['selector'],
+    },
+  },
+  {
     name: BROWSER_TOOL.FILL_REF,
     description: 'Fill a form field by its ref ID from the aria snapshot. Prefer this over fill_js when the ref is available.',
     input_schema: {
@@ -241,6 +253,20 @@ export async function executeBrowserTool(
           `${f.name ? ` name=${f.name}` : ''}` +
           `${f.placeholder ? ` placeholder="${f.placeholder}"` : ''}`,
       ).join('\n');
+    }
+
+    case BROWSER_TOOL.GET_INNER_TEXT: {
+      // innerText() reads what the browser has rendered to screen, including text inside elements
+      // that carry no ARIA role or accessible name and therefore don't appear in ariaSnapshot.
+      // Questrade's per-account equity values are one known example: the dollar amounts are
+      // visible but the surrounding divs have no accessible labels, so they're invisible to the
+      // AI snapshot mode.
+      const textLocator = input.frame
+        ? page.frameLocator(input.frame as string).locator(input.selector as string)
+        : page.locator(input.selector as string);
+      const text = await textLocator.first().innerText({ timeout: 5000 });
+      const MAX = 4000;
+      return text.length > MAX ? `${text.slice(0, MAX)}\n[truncated — ${text.length} chars total]` : text;
     }
 
     case BROWSER_TOOL.FILL_REF: {
