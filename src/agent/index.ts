@@ -100,18 +100,20 @@ async function takeSnapshot(
 }
 
 async function summarizePage(
-  snap: string, prevContext: string, systemPrompt: string, model: string,
+  snap: string, url: string, prevContext: string, systemPrompt: string, model: string,
   modelOptions?: ModelOptions,
 ): Promise<string> {
   const prompt = [
     `Task context:\n${systemPrompt}`,
     prevContext ? `Previously seen:\n${prevContext}` : null,
-    `Current page:\n${snap}`,
-    'Summarize the data on the current page that is relevant to the task. ' +
-      'Record exact dollar amounts and other key values verbatim with their labels and the URL ' +
-      'they appeared on — do not paraphrase or interpret labels. ' +
-      'Build on the previously seen context so the result is a full accumulated ' +
-      'picture of what has been observed so far.',
+    `Current page (URL: ${url}):\n${snap}`,
+    `Summarize the data on the current page that is relevant to the task. \
+Attribute each recorded value to this exact URL \
+so it is clear which page it came from. \
+Record exact dollar amounts and other key values verbatim with their labels — \
+do not paraphrase or interpret labels. \
+Build on the previously seen context so the result is a full accumulated \
+picture of what has been observed so far.`,
   ].filter(Boolean).join('\n\n');
   return callForText(model, prompt, 512, modelOptions);
 }
@@ -227,7 +229,7 @@ export async function runAgent<T>(
 
     const summaryStartedAt = Date.now();
     accumulatedContext = await summarizePage(
-      snap, accumulatedContext, systemPrompt, model, modelOptions,
+      snap, url, accumulatedContext, systemPrompt, model, modelOptions,
     );
     const summaryDurationMs = Date.now() - summaryStartedAt;
     await fs.appendFile(
