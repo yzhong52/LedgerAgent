@@ -12,7 +12,7 @@ export const accounts = sqliteTable('accounts', {
   accountId:          text('account_id').notNull(), // raw identifier as reported by the institution (e.g. last 4 digits); may change across syncs — use accounts.id for stable FK references
   name:               text('name').notNull(),
   type:               text('type'),
-  category:           text('category'),  // Cash | Credit | Self-Directed Investing | Managed Investing | General | Unknown
+  category:           text('category'),  // Cash | Credit | Self-Directed Investing | Managed Investing | External | General | Unknown
   currency:           text('currency'),
   // Denormalized from balances for O(1) current-balance reads. saveSync keeps these
   // in sync within the same transaction. Trade-off: the latest balance is stored twice

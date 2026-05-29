@@ -35,6 +35,7 @@ export const ACCOUNT_CATEGORIES = [
   'Credit',                 // Liability (credit card, mortgage, line of credit)
   'Self-Directed Investing', // User picks individual positions
   'Managed Investing',       // Robo-advisor or professionally managed
+  'External',                // Account held at another institution, linked here for reference only
   'General',                 // Catch-all when no other category fits
   'Unknown',                 // Cannot determine from available page information
 ] as const;
@@ -86,6 +87,7 @@ const REPORT_TOOL: Tool = {
                 '- Use "Credit" for liabilities such as credit cards, mortgages, and lines of credit.',
                 '- Use "Self-Directed Investing" for investment accounts where the user selects and manages individual positions.',
                 '- Use "Managed Investing" for robo-advisor accounts or professionally managed portfolios.',
+                '- Use "External" for accounts held at another institution that are linked here only for reference (e.g. a linked bank account used for transfers). Do not use this for accounts that are native to the current institution.',
                 '- Use "General" for accounts that do not fit any of the above categories.',
                 '- Use "Unknown" only if the category cannot be determined from the page.',
               ].join('\n'),
