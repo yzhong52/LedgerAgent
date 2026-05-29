@@ -201,6 +201,15 @@ export function printHoldingsTable(holdings: Holding[]): void {
   console.log();
 }
 
+export async function promptConfirm(question: string): Promise<boolean> {
+  while (true) {
+    const answer = (await prompt(question)).trim().toLowerCase();
+    if (answer === 'y') return true;
+    if (answer === 'n' || answer === '') return false;
+    console.log('  Please enter y or n.');
+  }
+}
+
 export async function confirm(label: string, defaultYes = false): Promise<boolean> {
   const idx = await selectFromList(
     ['Yes', 'No'],

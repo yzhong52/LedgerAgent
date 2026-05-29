@@ -110,10 +110,12 @@ npm run cli -- sync --institution "TD" --accountId 1234 --skip-accounts # one ac
 
 Opens a real Chrome window, logs in, discovers all accounts and balances, and saves them to a local SQLite database. Fetches transactions for the configured lookback window (default: 30 days). Run `sync` before listing accounts if none are stored yet.
 
-**List stored accounts and latest balances:**
+**Manage accounts:**
 
 ```bash
-npm run cli -- accounts list
+npm run cli -- accounts list                 # list all accounts and latest balances
+npm run cli -- accounts merge                # merge two accounts, combining their history
+npm run cli -- accounts delete               # permanently delete an account and all its history
 ```
 
 **List recent transactions:**

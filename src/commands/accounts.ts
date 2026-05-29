@@ -1,7 +1,9 @@
 import { Command } from 'commander';
 import { openDb } from '../db';
-import { listAccounts, mergeAccounts, type AccountRow, type AccountSyncDiff } from '../db/storage';
-import { prompt, printAccountsTable, formatCents, selectFromList } from './utils';
+import {
+  listAccounts, mergeAccounts, deleteAccount, type AccountRow, type AccountSyncDiff,
+} from '../db/storage';
+import { promptConfirm, printAccountsTable, formatCents, selectFromList } from './utils';
 
 function accountLabels(
   rows: AccountRow[],
@@ -199,14 +201,44 @@ export function makeAccountsCommand(): Command {
         console.log(`  Duplicates (same date or transaction ID) keep the target's existing data.`);
         console.log(`  The source account will be permanently deleted.`);
         console.log();
-        const confirm = await prompt('  Confirm (y/N): ');
-        if (confirm.trim().toLowerCase() !== 'y') {
+        if (!await promptConfirm('  Confirm (y/N): ')) {
           console.log('  Aborted.');
           return;
         }
 
         mergeAccounts(db, src.id, tgt.id);
         console.log(`  Done. "${src.accountName}" merged into "${tgt.accountName}".`);
+      } finally {
+        close();
+      }
+    });
+
+  cmd
+    .command('delete')
+    .description('Permanently delete an account and all its history (balances, transactions, holdings)')
+    .action(async () => {
+      const { db, close } = openDb();
+      try {
+        const rows = listAccounts(db);
+        if (rows.length === 0) {
+          console.log('No accounts found.');
+          return;
+        }
+
+        const { header, labels } = accountLabels(rows, { showInstitution: true });
+        const idx = await selectFromList(labels, 'Choose an account to delete:', new Set(), header);
+        const account = rows[idx];
+
+        console.log(`  Delete "${account.accountName}" (${account.institutionName})?`);
+        console.log(`  All balances, transactions, and holdings for this account will be permanently deleted.`);
+        console.log();
+        if (!await promptConfirm('  Confirm (y/N): ')) {
+          console.log('  Aborted.');
+          return;
+        }
+
+        deleteAccount(db, account.id);
+        console.log(`  Done. "${account.accountName}" deleted.`);
       } finally {
         close();
       }

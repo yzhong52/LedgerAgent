@@ -423,6 +423,15 @@ export function saveHoldings(db: Db, accountId: number, holdingList: Holding[]):
   });
 }
 
+export function deleteAccount(db: Db, id: number): void {
+  db.transaction((tx) => {
+    tx.delete(balances).where(eq(balances.accountId, id)).run();
+    tx.delete(transactionsTable).where(eq(transactionsTable.accountId, id)).run();
+    tx.delete(holdingsTable).where(eq(holdingsTable.accountId, id)).run();
+    tx.delete(accountsTable).where(eq(accountsTable.id, id)).run();
+  });
+}
+
 export function mergeAccounts(db: Db, sourceId: number, targetId: number): void {
   db.transaction((tx) => {
     const sourceBalances = tx
