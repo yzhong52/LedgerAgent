@@ -78,6 +78,53 @@ function toCents(amount: number | undefined | null): number | null {
   return Math.round(amount * 100);
 }
 
+function fmt(c: number | null): string {
+  if (c == null) return '—';
+  const abs = Math.abs(c) / 100;
+  const s = abs.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return c < 0 ? `-$${s}` : `$${s}`;
+}
+
+interface ResolvedAccount {
+  name: string;
+  type: string | null;
+  category: string | null;
+  currency: string | null;
+  amountCents: number | null;
+}
+
+// Merges agent-reported values with the stored account. Agent values take precedence;
+// stored values fill in any fields the agent didn't report.
+function resolveAccount(account: Account, stored: AccountRow): ResolvedAccount {
+  return {
+    name: account.name,
+    type: normalizeType(account.type) ?? stored.accountType ?? null,
+    category: normalizeCategory(account.category) ?? stored.accountCategory ?? null,
+    currency: account.currency ?? stored.accountCurrency ?? null,
+    amountCents: toCents(account.balance),
+  };
+}
+
+function diffAccount(resolved: ResolvedAccount, stored: AccountRow): string[] {
+  const changes: string[] = [];
+  if (stored.amountCents !== resolved.amountCents) {
+    changes.push(`balance ${fmt(stored.amountCents)} → ${fmt(resolved.amountCents)}`);
+  }
+  if (stored.accountType !== resolved.type) {
+    changes.push(`type ${stored.accountType ?? '—'} → ${resolved.type ?? '—'}`);
+  }
+  if (stored.accountCategory !== resolved.category) {
+    changes.push(`category ${stored.accountCategory ?? '—'} → ${resolved.category ?? '—'}`);
+  }
+  if (stored.accountCurrency !== resolved.currency) {
+    changes.push(`currency ${stored.accountCurrency ?? '—'} → ${resolved.currency ?? '—'}`);
+  }
+  if (stored.accountName !== resolved.name) {
+    changes.push(`name "${stored.accountName}" → "${resolved.name}"`);
+  }
+  return changes;
+}
+
 export function saveSync(
   db: Db,
   institutionName: string,
@@ -85,6 +132,8 @@ export function saveSync(
   accountList: Account[],
 ): AccountSyncDiff {
   const institutionId = slugify(institutionName);
+  const now = new Date();
+  const today = toDateString(now);
 
   const existing = listAccounts(db).filter(r => r.institutionName === institutionName);
   const existingByAccountId = new Map(existing.map(r => [r.accountId, r]));
@@ -100,31 +149,8 @@ export function saveSync(
     if (!prev) {
       added.push(account);
     } else {
-      const changes: string[] = [];
-      const newCents = toCents(account.balance);
-      if (prev.amountCents !== newCents) {
-        const fmt = (c: number | null) => {
-          if (c == null) return '—';
-          const abs = Math.abs(c) / 100;
-          const s = abs.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-          return c < 0 ? `-$${s}` : `$${s}`;
-        };
-        changes.push(`balance ${fmt(prev.amountCents)} → ${fmt(newCents)}`);
-      }
-      const newType = normalizeType(account.type) ?? null;
-      if ((prev.accountType ?? null) !== newType) {
-        changes.push(`type ${prev.accountType ?? '—'} → ${newType ?? '—'}`);
-      }
-      const newCategory = normalizeCategory(account.category) ?? null;
-      if ((prev.accountCategory ?? null) !== newCategory) {
-        changes.push(`category ${prev.accountCategory ?? '—'} → ${newCategory ?? '—'}`);
-      }
-      if ((prev.accountCurrency ?? null) !== (account.currency ?? null)) {
-        changes.push(`currency ${prev.accountCurrency ?? '—'} → ${account.currency ?? '—'}`);
-      }
-      if (prev.accountName !== account.name) {
-        changes.push(`name "${prev.accountName}" → "${account.name}"`);
-      }
+      const resolved = resolveAccount(account, prev);
+      const changes = diffAccount(resolved, prev);
       if (changes.length > 0) updated.push({ account, changes });
     }
   }
@@ -138,46 +164,50 @@ export function saveSync(
       })
       .run();
 
-    const now = new Date();
-    const today = toDateString(now);
-
     tx.insert(syncs)
       .values({ institutionId, syncedAt: now.toISOString() })
       .run();
 
     for (const account of accountList) {
       const rawAccountId = account.accountId ?? account.name;
-      const amountCents = toCents(account.balance);
+      const prev = existingByAccountId.get(rawAccountId);
+      const resolved = prev ? resolveAccount(account, prev) : {
+        name: account.name,
+        type: normalizeType(account.type) ?? null,
+        category: normalizeCategory(account.category) ?? null,
+        currency: account.currency ?? null,
+        amountCents: toCents(account.balance),
+      };
 
-      if (normalizeCategory(account.category) === 'Credit' && amountCents !== null && amountCents > 0) {
+      if (resolved.category === 'Credit' && resolved.amountCents !== null && resolved.amountCents > 0) {
         console.warn(
-          `[saveSync] Credit account "${account.name}" has a positive balance ` +
-          `(${amountCents / 100}). Expected negative (amount owed). ` +
+          `[saveSync] Credit account "${resolved.name}" has a positive balance ` +
+          `(${resolved.amountCents / 100}). Expected negative (amount owed). ` +
           `This may indicate an overpayment credit or the agent reported the wrong sign.`
         );
       }
 
       const { id: intId } = tx.insert(accountsTable)
         .values({
-          institutionId, accountId: rawAccountId, name: account.name,
-          type: normalizeType(account.type), category: normalizeCategory(account.category),
-          currency: account.currency, latestDate: today, latestAmountCents: amountCents,
+          institutionId, accountId: rawAccountId,
+          name: resolved.name, type: resolved.type, category: resolved.category,
+          currency: resolved.currency, latestDate: today, latestAmountCents: resolved.amountCents,
         })
         .onConflictDoUpdate({
           target: [accountsTable.institutionId, accountsTable.accountId],
           set: {
-            type: normalizeType(account.type), category: normalizeCategory(account.category),
-            currency: account.currency, latestDate: today, latestAmountCents: amountCents,
+            name: resolved.name, type: resolved.type, category: resolved.category,
+            currency: resolved.currency, latestDate: today, latestAmountCents: resolved.amountCents,
           },
         })
         .returning({ id: accountsTable.id })
         .get();
 
       tx.insert(balances)
-        .values({ accountId: intId, date: today, amountCents })
+        .values({ accountId: intId, date: today, amountCents: resolved.amountCents })
         .onConflictDoUpdate({
           target: [balances.accountId, balances.date],
-          set: { amountCents },
+          set: { amountCents: resolved.amountCents },
         })
         .run();
     }

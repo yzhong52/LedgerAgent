@@ -67,6 +67,24 @@ describe('saveSync', () => {
       'name "Old" → "New"',
     ]);
   });
+
+  it('omitting currency does not flag a change or overwrite the stored value', () => {
+    saveSync(db, 'TD', 'https://td.com', [CHQ]); // CHQ has currency: 'CAD'
+    const { accountId } = CHQ;
+    const withoutCurrency = { name: CHQ.name, accountId, type: CHQ.type, balance: CHQ.balance };
+    const diff = saveSync(db, 'TD', 'https://td.com', [withoutCurrency]);
+    expect(diff.updated).toHaveLength(0); // no false change
+    const stored = listAccounts(db).find(a => a.accountId === accountId);
+    expect(stored?.accountCurrency).toBe('CAD'); // value preserved
+  });
+
+  it('explicit currency change is detected and written', () => {
+    saveSync(db, 'TD', 'https://td.com', [CHQ]); // CAD
+    const diff = saveSync(db, 'TD', 'https://td.com', [{ ...CHQ, currency: 'USD' }]);
+    expect(diff.updated[0].changes).toEqual(['currency CAD → USD']);
+    const stored = listAccounts(db).find(a => a.accountId === CHQ.accountId);
+    expect(stored?.accountCurrency).toBe('USD');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -142,9 +160,9 @@ describe('example console output', () => {
 
         Account   ID    Type            Balance  Last Updated
         --------  ----  -------  --------------  ------------
-        Chequing  chq   General   CAD $1,500.00  2026-05-17
-        RRSP      rrsp  RRSP     CAD $50,000.00  2026-05-17
-        Savings   sav   TFSA      CAD $2,000.00  2026-05-17
+        Chequing  chq   General   CAD $1,500.00  2026-05-30
+        RRSP      rrsp  RRSP     CAD $50,000.00  2026-05-30
+        Savings   sav   TFSA      CAD $2,000.00  2026-05-30
       "
     `);
   });
