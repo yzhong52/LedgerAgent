@@ -1,6 +1,7 @@
 import type {
   ContentBlockParam,
   MessageParam,
+  TextBlock,
   Tool,
   ToolResultBlockParam,
 } from '@anthropic-ai/sdk/resources/messages';
@@ -21,6 +22,7 @@ export { SUCCESS_TOOL } from './tools';
 export { createSession, SEPARATOR } from './log_utils';
 
 export const MAX_TURNS = 20;
+const MAX_EMPTY_RETRIES = 3;
 
 export interface ToolContinue {
   done: false;
@@ -190,32 +192,47 @@ export async function runAgent<T>(
 
     let response;
     let modelDurationMs = 0;
-    try {
-      const modelStartedAt = Date.now();
-      response = await callWithTools({
-        model,
-        modelOptions,
-        maxTokens,
-        system: systemPrompt,
-        tools,
-        prevMessages,
-        currentMessage: currentUserMsg,
-      });
-      modelDurationMs = Date.now() - modelStartedAt;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await fs.appendFile(logFile, `### Agent → User\n\n**Error:** ${msg}\n\n`);
-      throw err;
+    for (let attempt = 0; attempt < MAX_EMPTY_RETRIES; attempt++) {
+      try {
+        const modelStartedAt = Date.now();
+        response = await callWithTools({
+          model,
+          modelOptions,
+          maxTokens,
+          system: systemPrompt,
+          tools,
+          prevMessages,
+          currentMessage: currentUserMsg,
+        });
+        modelDurationMs = Date.now() - modelStartedAt;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        await fs.appendFile(logFile, `### Agent → User\n\n**Error:** ${msg}\n\n`);
+        throw err;
+      }
+
+      await fs.appendFile(logFile, `### Agent → User (${formatDuration(modelDurationMs)})\n\n`);
+      await fs.appendFile(
+        logFile,
+        `\`\`\`json\n${redactSensitive(JSON.stringify(response.rawForLog, null, 2))}\n\`\`\`\n\n`,
+      );
+
+      if (response.toolUses.length > 0) break;
+
+      const modelText = response.assistantContent
+        .filter((b): b is TextBlock => b.type === 'text')
+        .map(b => b.text)
+        .join('\n')
+        .trim();
+      console.log(`[agent] model returned no tool calls${modelText ? `:\n${modelText}` : ''}`);
+      if (attempt < MAX_EMPTY_RETRIES - 1) {
+        console.log(`[agent] retrying (${attempt + 1}/${MAX_EMPTY_RETRIES})...`);
+      } else {
+        throw new Error('unexpected: model returned no tool calls after retries');
+      }
     }
 
-    await fs.appendFile(logFile, `### Agent → User (${formatDuration(modelDurationMs)})\n\n`);
-    await fs.appendFile(
-      logFile,
-      `\`\`\`json\n${redactSensitive(JSON.stringify(response.rawForLog, null, 2))}\n\`\`\`\n\n`,
-    );
-
-    const toolUses = response.toolUses;
-    if (toolUses.length === 0) throw new Error('unexpected: model returned no tool calls');
+    const toolUses = response!.toolUses;
     for (const toolUse of toolUses) {
       logToolUse(
         turn,
