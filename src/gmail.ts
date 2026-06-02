@@ -35,7 +35,7 @@ export async function fetchMfaCode(
 
   const deadline = verbose ? 0 : Date.now() + POLL_TIMEOUT_MS;
 
-  console.log('Checking Gmail for MFA code... ⏳');
+  console.log('    ⏳ Checking Gmail for MFA code...');
 
   try {
     await client.connect();
@@ -160,7 +160,7 @@ async function searchForCode(
       console.log(`  ✉️  ${subject} (${ago})`);
       console.log(`     👤 from: ${sender}`);
     } else {
-      console.log(`  – "${subject}" from ${sender} (${ageMins}m ago)`);
+      console.log(`    ✉️ "${subject}" from ${sender} (${ageMins}m ago)`);
     }
 
     const rawSource = msg.source.toString();
