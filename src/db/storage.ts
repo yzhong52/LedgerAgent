@@ -216,6 +216,20 @@ export function saveSync(
   return { added, updated, missing };
 }
 
+export interface BalanceCheckpoint {
+  date: string;
+  amountCents: number | null;
+}
+
+export function listBalances(db: Db, accountId: number): BalanceCheckpoint[] {
+  return db
+    .select({ date: balances.date, amountCents: balances.amountCents })
+    .from(balances)
+    .where(eq(balances.accountId, accountId))
+    .orderBy(desc(balances.date))
+    .all();
+}
+
 export interface NetWorthPoint {
   date: string;
   amountCents: number;

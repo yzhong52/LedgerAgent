@@ -1,7 +1,8 @@
 import { Command } from 'commander';
 import { openDb } from '../db';
 import {
-  listAccounts, mergeAccounts, deleteAccount, type AccountRow, type AccountSyncDiff,
+  listAccounts, mergeAccounts, deleteAccount, listBalances,
+  type AccountRow, type AccountSyncDiff,
 } from '../db/storage';
 import { promptConfirm, printAccountsTable, formatCents, selectFromList } from './utils';
 
@@ -208,6 +209,61 @@ export function makeAccountsCommand(): Command {
 
         mergeAccounts(db, src.id, tgt.id);
         console.log(`  Done. "${src.accountName}" merged into "${tgt.accountName}".`);
+      } finally {
+        close();
+      }
+    });
+
+  cmd
+    .command('checkpoints')
+    .description('Show the full balance history for a selected account')
+    .action(async () => {
+      const { db, close } = openDb();
+      try {
+        const rows = listAccounts(db);
+        if (rows.length === 0) {
+          console.log('No accounts found. Run: npm run cli -- sync');
+          return;
+        }
+
+        const { header, labels } = accountLabels(rows, { showInstitution: true });
+        const idx = await selectFromList(labels, 'Choose an account:', new Set(), header);
+        const account = rows[idx];
+        const checkpoints = listBalances(db, account.id);
+
+        if (checkpoints.length === 0) {
+          console.log(`  No balance history found for "${account.accountName}".`);
+          return;
+        }
+
+        console.log(`\n  Balance history for ${account.accountName} (${account.institutionName}):\n`);
+
+        const currency = account.accountCurrency;
+        const rows2 = checkpoints.map((cp, i) => {
+          const prev = checkpoints[i + 1];
+          let change = '';
+          if (prev?.amountCents != null && cp.amountCents != null) {
+            const delta = cp.amountCents - prev.amountCents;
+            const sign = delta >= 0 ? '+' : '';
+            change = `${sign}${formatCents(delta)}`;
+          }
+          const bal = cp.amountCents != null
+            ? (currency ? `${currency} ${formatCents(cp.amountCents)}` : formatCents(cp.amountCents))
+            : '—';
+          return { date: cp.date, balance: bal, change };
+        });
+
+        const wDate    = Math.max('Date'.length,    ...rows2.map(r => r.date.length));
+        const wBalance = Math.max('Balance'.length,  ...rows2.map(r => r.balance.length));
+        const wChange  = Math.max('Change'.length,   ...rows2.map(r => r.change.length));
+
+        const fmt = (date: string, balance: string, change: string) =>
+          `  ${date.padEnd(wDate)}  ${balance.padStart(wBalance)}  ${change.padStart(wChange)}`;
+
+        console.log(fmt('Date', 'Balance', 'Change'));
+        console.log(fmt('-'.repeat(wDate), '-'.repeat(wBalance), '-'.repeat(wChange)));
+        for (const r of rows2) console.log(fmt(r.date, r.balance, r.change));
+        console.log();
       } finally {
         close();
       }
